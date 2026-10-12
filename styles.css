@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }
 /* Layout: login > welcome > app shell (sidebar on desktop, bottom bar on phone) with five views: Home, Trendline, Revision, Reports, Tricks */
 :root{
   --bg:#EDF1EF; --surface:#FFFFFF; --surface2:#E2E9E6; --ink:#12231F; --muted:#586964; --line:#CFD9D5;
