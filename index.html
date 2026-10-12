@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0E6B5B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Bharathi's Study Tracker</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="login">
+  <div class="blob b1"></div><div class="blob b2"></div>
+  <span class="glyph" style="left:8%;top:18%;animation-delay:-1s">&Sigma;</span>
+  <span class="glyph" style="left:84%;top:14%;animation-delay:-4s">&pi;</span>
+  <span class="glyph" style="left:12%;top:76%;animation-delay:-2s">&radic;</span>
+  <span class="glyph" style="left:78%;top:70%;animation-delay:-6s">%</span>
+  <span class="glyph" style="left:48%;top:6%;animation-delay:-3s">&times;</span>
+  <span class="glyph" style="left:36%;top:88%;animation-delay:-5s">&sup3;</span>
+  <form id="lform" class="lcard" autocomplete="off">
+    <div class="brandmark"><div class="logo">B</div><div class="label">SSC Study Tracker</div></div>
+    <h1 id="ltitle">Welcome back</h1>
+    <p class="sub" id="lsub">Sign in to see today's plan.</p>
+    <div class="field" id="fName" hidden><label class="label" for="uname">Your name</label>
+      <div class="box"><input id="uname" type="text" autocomplete="off"></div></div>
+    <div class="field"><label class="label" for="user" id="luL">User name</label>
+      <div class="box"><input id="user" type="text" autocomplete="username" spellcheck="false" autocapitalize="off"></div></div>
+    <div class="field"><label class="label" for="pass">Password</label>
+      <div class="box"><input id="pass" type="password" autocomplete="current-password">
+        <button type="button" class="eye" id="eye" aria-label="Show password"></button></div></div>
+    <div class="row"><label class="check"><input id="remember" type="checkbox" checked>Remember me</label></div>
+    <button class="btn block" type="submit" id="lbtn">Sign in</button>
+    <div class="err" id="err" role="alert"></div>
+    <button type="button" class="link" id="ltoggle" hidden>Create account</button>
+  </form>
+</div>
+
+<!-- WELCOME -->
+<div id="welcome" class="welcome" hidden>
+  <div>
+    <div class="greet" id="greet">Good morning</div>
+    <div class="name" id="wname"></div>
+    <p class="line" id="wline"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app" hidden>
+  <nav class="side" id="side" aria-label="Main"></nav>
+  <main class="main">
+    <div class="top">
+      <h2 id="vtitle">Home</h2>
+      <div class="tools">
+        <span class="pill" id="sync">This device only</span>
+        <button class="icon-btn" data-act="theme" aria-label="Switch theme" title="Switch theme" id="themeBtn"></button>
+        <button class="icon-btn" data-act="logout" aria-label="Sign out" title="Sign out" id="outBtn"></button>
+      </div>
+    </div>
+    <div id="view"></div>
+  </main>
+  <button class="fab" data-act="fab" aria-label="Quick add" title="Quick add">+</button>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal" hidden>
+  <form id="mform" class="sheet" autocomplete="off">
+    <div class="sheethead"><h3 id="mtitle"></h3><button type="button" class="icon-btn" data-act="closeModal" aria-label="Close">&times;</button></div>
+    <div id="mbody"></div>
+    <div class="err" id="merr" role="alert"></div>
+    <div id="mfoot"><button class="btn block" id="msubmit" type="submit">Save</button></div>
+  </form>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
