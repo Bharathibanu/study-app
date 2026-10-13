@@ -378,3 +378,10 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 .math-extra summary{flex-wrap:wrap;gap:10px}
 .lv .t .quiet{font-size:13px}
 @media(max-width:480px){.table-controls{grid-template-columns:1fr}.refgrid.table-reference{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.masterclass-examples{border-left:3px solid var(--accent);padding:10px 14px;margin-top:12px;background:var(--surface)}
+.masterclass-examples p{margin-top:8px;white-space:normal}
+.course-day{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line);cursor:pointer}
+.course-day input{accent-color:var(--teal);width:20px;height:20px;flex-shrink:0}
+#method-result p{margin-top:10px}#method-x,#method-y{width:140px;max-width:100%}
+#masterclass-test{margin-top:14px}

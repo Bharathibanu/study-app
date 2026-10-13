@@ -3,6 +3,7 @@
    and, if Firebase is set up, synced to your account so phone and PC match. */
 import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
+import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
 import { clone, sameState, mergeStates } from './ssc-core.js';
 
@@ -100,7 +101,7 @@ const blank = () => ({
   v: 1, _u: 0, created: today(), name: '',
   settings: { target: 6, budget: 6000, exam: '', pomo: 25, brk: 5, why: '', day1: '' },
   plan: [], planFrom: '', tasks: [], logs: [], rev: [], exp: [], meet: [], qr: [], mist: [], mocks: [], notes: [], mastered: {},
-  practice: [], mistakeBook: [], revisionHistory: [], mockAnalyses: [],
+  practice: [], mistakeBook: [], revisionHistory: [], mockAnalyses: [], masterclassDays: [],
   canteen: { prices: { tea: 12, snack: 10, lunch: 52 }, days: {} }, todos: [], books: [], learn: [], diary: []
 });
 function loadLocal() {
@@ -587,6 +588,7 @@ const RV = { kind: null, mode: 'learn', mcq: false, tableBase: '12', tableLimit:
 const isPrime = (n) => { if (n < 2) return false; for (let i = 2; i * i <= n; i++) if (n % i === 0) return false; return true; };
 function gen(kind, n) {
   const out = [], seen = new Set();
+  if (/^t[1-5]$/.test(kind)) return mentalPracticeQuestions(Number(kind.slice(1)),n);
   if (kind === 'tb') return multiplicationQuestions(RV.tableBase,RV.tableLimit,n);
   if (kind === 'pr') {
     const P = [], C = []; for (let i = 2; i <= 150; i++) (isPrime(i) ? P : C).push(i);
@@ -600,10 +602,6 @@ function gen(kind, n) {
     switch (kind) {
       case 'sq': x = ri(2, 100); q = r < .7 ? { t: x + '² = ?', a: x * x } : { t: '√' + x * x + ' = ?', a: x }; break;
       case 'cu': x = ri(2, 100); q = r < .7 ? { t: x + '³ = ?', a: x * x * x } : { t: '∛' + x * x * x + ' = ?', a: x }; break;
-      case 't1': if (r < .5) { x = ri(12, 99); q = { t: x + ' × 11 = ?', a: x * 11 }; } else if (r < .75) { x = ri(12, 98); q = { t: x + ' × 5 = ?', a: x * 5 }; } else { x = ri(13, 99); q = { t: x + ' × 4 = ?', a: x * 4 }; } break;
-      case 't2': if (r < .3) { x = ri(12, 99); q = { t: x + ' × 9 = ?', a: x * 9 }; } else if (r < .55) { x = ri(11, 60); q = { t: x + ' × 99 = ?', a: x * 99 }; } else if (r < .8) { x = ri(6, 40) * 2; q = { t: x + ' × 25 = ?', a: x * 25 }; } else { x = ri(11, 90); q = { t: x + ' × 50 = ?', a: x * 50 }; } break;
-      case 't3': if (r < .4) { x = ri(1, 9) * 10 + 5; q = { t: x + '² = ?', a: x * x }; } else if (r < .7) { x = ri(91, 99); y = ri(91, 99); q = { t: x + ' × ' + y + ' = ?', a: x * y }; } else { x = ri(3, 9) * 10; y = ri(1, 4); q = { t: (x + y) + ' × ' + (x - y) + ' = ?', a: x * x - y * y }; } break;
-      case 't4': x = ri(11, 99); y = ri(11, 99); q = { t: x + ' × ' + y + ' = ?', a: x * y }; break;
       default: { const p = [12.5, 25, 37.5, 62.5, 75, 6.25][ri(0, 5)], b = ri(5, 60) * 16; q = { t: p + '% of ' + b + ' = ?', a: Math.round(b * p / 100) }; }
     }
     if (seen.has(q.t)) continue; seen.add(q.t); q.show = String(q.a); out.push(q);
@@ -631,11 +629,12 @@ function quizDraw(box) {
     el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:10px 0 16px"><div class="score">${Z.score}<span style="font-size:26px;color:var(--muted)"> / ${n}</span></div><div class="quiet">Time ${Math.floor(Z.secs / 60)}m ${Z.secs % 60}s · ${Math.round(Z.score / n * 100)}% accuracy</div></div>
     <div class="fb ${good ? 'ok' : 'no'}" style="${good ? '' : 'background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--warn)'}">${good ? 'Excellent work.' : 'Done. Review the answers below and try a new set.'}</div>
     ${Z.wrong.length ? `<h3 style="margin-top:18px;font-size:15px">${Z.noteMist ? 'Added to your mistakes notebook' : 'Missed'}</h3><div class="wrong">${w}</div>` : ''}
-    <div class="actions" style="margin-top:18px"><button class="btn" data-act="qzAgain" data-box="${box}">${Z.modelId ? 'Try this model again' : 'Try a new set'}</button></div>`;
+    <div class="actions" style="margin-top:18px"><button class="btn" data-act="qzAgain" data-box="${box}">${Z.mathTest ? 'Retry mental maths test' : Z.modelId ? 'Try this model again' : 'Try a new set'}</button></div>`;
     if (good && !Z.confettied) { Z.confettied = true; confetti(); }
     return;
   }
   const q = Z.qs[Z.i]; let input;
+  if (Z.questionIndex !== Z.i) { Z.questionIndex = Z.i; Z.questionStarted = Date.now(); }
   if (q.yn) input = `<div class="ans"><button class="btn" data-act="qzAns" data-box="${box}" data-v="yes">Yes</button><button class="btn ghost" data-act="qzAns" data-box="${box}" data-v="no">No</button></div>`;
   else if (Z.mcq) { if (!q.opts) q.opts = mcqOpts(q.a); input = `<div class="ans mcq">${q.opts.map((o) => `<button class="btn ghost" data-act="qzAns" data-box="${box}" data-v="${o}">${o}</button>`).join('')}</div>`; }
   else input = `<div class="ans"><input id="${box}-in" type="text" inputmode="numeric" autocomplete="off" aria-label="Your answer"><button class="btn" data-act="qzCheck" data-box="${box}">Check answer</button></div>`;
@@ -646,7 +645,9 @@ function quizCheck(box, v) {
   const Z = QZ[box]; if (!Z || Z.checked) return; const q = Z.qs[Z.i];
   v = String(v).trim().toLowerCase(); if (!v) return;
   const ok = q.yn ? v === q.a : Number(v.replace(/[,\s]/g, '')) === q.a;
-  Z.checked = true; Z.lastAnswer = v; if (ok) Z.score++; else Z.wrong.push(q);
+  Z.checked = true; Z.lastAnswer = v;
+  if (!Z.answers) Z.answers = [];
+  Z.answers[Z.i] = { value: v, ok, seconds: Math.max(1,Math.round((Date.now() - (Z.questionStarted || Z.t0))/1000)) }; if (ok) Z.score++; else Z.wrong.push(q);
   document.getElementById(box + '-fb').innerHTML = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? 'Correct.' : 'Not quite. Answer: ' + esc(q.show)}</div>${q.explanation ? '<p class="quiet">'+esc(q.explanation)+'</p>' : ''}<div style="margin-top:12px"><button class="btn" id="${box}-nx" data-act="qzNext" data-box="${box}">${Z.i === Z.qs.length - 1 ? 'See score' : 'Next question'}</button></div>`;
   $$('#' + box + ' .ans button, #' + box + ' .ans input').forEach((b) => { b.disabled = true; });
   const nx = document.getElementById(box + '-nx'); if (nx) nx.focus();
@@ -857,13 +858,17 @@ const TRICKS = [
     ['Percentages as fractions', '12.5% = 1/8, 16⅔% = 1/6, 33⅓% = 1/3 (16.67% and 33.33% are rounded approximations), 37.5% = 3/8, 62.5% = 5/8, 6.25% = 1/16. 37.5% of 640 = 3 × 80 = 240.'],
     ['Simplification order', 'Brackets, orders, division and multiplication left to right, then addition and subtraction. Spot identities before multiplying large numbers.']] }
 ];
+for (const method of MASTERCLASS_ADDITIONS) TRICKS.find(level => level.lv === method.level).items.push([method.title,method.text]);
+const masterclassLevelNames = ['Foundations', 'Special multipliers', 'Number patterns', 'Advanced multiplication', 'SSC speed training'];
+const masterclassLevelDescriptions = ['Splitting, left-to-right, doubling and halving', 'Special multipliers from ×5 through ×1001', 'Near100/1000, squares and complementary units', 'Compensation, factorization, crosswise and chunking', 'Estimation, squares, fractions and method selection'];
+TRICKS.forEach((level,i) => { level.title = masterclassLevelNames[i]; level.sub = masterclassLevelDescriptions[i]; });
 const dr = (n) => (n % 9 === 0 ? 9 : n % 9);
 VIEWS.tricks = function () {
   const m = TRICKS.filter((x) => S.mastered[x.lv]).length;
-  return `<div class="grid g2"><div class="card"><h3>Numbers near 100</h3><p class="quiet" style="margin-bottom:12px">Pick two numbers between 80 and 99 and watch the method run.</p>
+  return `${masterclassIntro(S.masterclassDays || [])}<div class="grid g2"><div class="card"><h3>Numbers near 100</h3><p class="quiet" style="margin-bottom:12px">Pick two numbers between 80 and 99 and watch the method run.</p>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="n1" class="num" type="text" inputmode="numeric" value="97" aria-label="First number"><span class="mono" style="font-size:22px">&times;</span><input id="n2" class="num" type="text" inputmode="numeric" value="94" aria-label="Second number"><button class="btn" data-act="runTrick">Show steps</button></div><div class="steps" id="steps"></div></div>
   <div class="card"><h3>Your progress</h3><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Multiplication levels mastered</span><span class="mono">${m} / 5</span></div><div class="bar"><i style="width:${m * 20}%"></i></div><p class="quiet" style="margin-top:12px">Open a level, read the tricks, try the 5 practice questions, then tick Mastered.</p></div></div>
-  <div style="margin-top:14px">${TRICKS.map((x) => `<details class="lv"><summary><span class="lvnum">${x.lv}</span><span style="flex:1"><b>${x.title}</b><br><span class="quiet" style="font-weight:400">${x.sub}</span></span>${S.mastered[x.lv] ? '<span class="badge green">Mastered</span>' : ''}</summary><div class="body">${x.items.map((i) => `<div class="t"><b>${i[0]}</b>${i[1]}${trickVisual(i[0])}</div>`).join('')}<div id="tq${x.lv}"></div><div class="actions"><button class="btn sm" data-act="trickQuiz" data-v="${x.lv}">Try 5 questions</button><button class="btn sm ghost" data-act="mastered" data-v="${x.lv}">${S.mastered[x.lv] ? 'Unmark mastered' : 'Mark as mastered'}</button></div></div></details>`).join('')}</div>${sscMathHTML(S.mastered)}`;
+  <div style="margin-top:14px">${TRICKS.map((x) => `<details class="lv" data-level="${x.lv}"><summary><span class="lvnum">${x.lv}</span><span style="flex:1"><b>${x.title}</b><br><span class="quiet" style="font-weight:400">${x.sub}</span></span>${S.mastered[x.lv] ? '<span class="badge green">Mastered</span>' : ''}</summary><div class="body">${x.items.map((i) => `<div class="t"><b>${i[0]}</b>${i[1]}${trickVisual(i[0])}${mergedExampleHTML(i[0])}</div>`).join('')}<div id="tq${x.lv}"></div><div class="actions"><button class="btn sm" data-act="trickQuiz" data-v="${x.lv}">Try 5 questions</button><button class="btn sm ghost" data-act="mastered" data-v="${x.lv}">${S.mastered[x.lv] ? 'Unmark mastered' : 'Mark as mastered'}</button></div></div></details>`).join('')}</div>${masterclassResources(S.masterclassDays || [])}${sscMathHTML(S.mastered)}`;
 };
 AFTER.tricks = runTrick;
 function runTrick() {
@@ -1156,7 +1161,7 @@ const ACT = {
   qzCheck: (d) => { const i = document.getElementById(d.box + '-in'); quizCheck(d.box, i ? i.value : ''); },
   qzAns: (d) => quizCheck(d.box, d.v),
   qzNext: (d) => quizNext(d.box),
-  qzAgain: (d) => { if (d.box === 'qz') ACT.qzStartRev(); else { const Z = QZ[d.box]; if (Z.modelId) ACT.mathModelPractice({ id: Z.modelId }); else quizStart(d.box, Z.kind, 5, {}); } },
+  qzAgain: (d) => { if (d.box === 'qz') ACT.qzStartRev(); else { const Z = QZ[d.box]; if (Z.mathTest) ACT.masterclassTest(); else if (Z.modelId) ACT.mathModelPractice({ id: Z.modelId }); else quizStart(d.box, Z.kind, 5, {onDone:Z.onDone}); } },
   flip: () => { FL.show = !FL.show; flashDraw(); },
   flashNext: () => { if (FL.i >= FL.qs.length - 1) flashNew(); else { FL.i++; FL.show = false; } flashDraw(); },
   repMode: (d) => { REP.mode = d.v; render(); },
@@ -1190,13 +1195,39 @@ const ACT = {
   skipToday: () => { const t = today(); S.plan.forEach((r) => { if (r.date >= t) r.date = addD(r.date, 1); }); persist(); toast('Plan pushed by one day'); render(); },
   clearPlan: () => { S.plan = []; S.tasks = S.tasks.filter((k) => !(k.pk && !k.done && k.spent === 0)); persist(); render(); },
   runTrick: () => runTrick(),
-  trickQuiz: (d) => { const kind = 't' + d.v; $('#tq' + d.v).innerHTML = '<div id="tqz' + d.v + '"></div>'; const box = 'tqz' + d.v; quizStart(box, kind, 5, {}); },
+  trickQuiz: (d) => { const kind = 't' + d.v; $('#tq' + d.v).innerHTML = '<div id="tqz' + d.v + '"></div>'; const box = 'tqz' + d.v; quizStart(box, kind, 5, {onDone: Z => recordMentalSession(Z,'Maths Tricks level '+d.v)}); },
   mastered: (d) => { S.mastered[d.v] = !S.mastered[d.v]; persist(); const open = $$('details.lv').map((x) => x.open); render(); $$('details.lv').forEach((x, i) => { x.open = open[i]; }); },
   exportData: () => { download('study-tracker-backup-' + today() + '.json', JSON.stringify(S, null, 2), 'application/json'); toast('Backup downloaded'); },
   loadDemo: () => { loadDemo(); toast('Sample data loaded'); render(); },
   clearDemo: () => clearDemo(),
   resetAll: (d, b) => { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to erase everything'; b.style.color = 'var(--bad)'; setTimeout(() => { b.dataset.sure = ''; b.textContent = 'Erase everything'; b.style.color = ''; }, 4000); return; } const nm = S.name; S = blank(); S.name = nm; persist(); toast('All data erased'); show('home'); },
   notif: () => { if (!('Notification' in window)) { toast('This browser does not support reminders'); return; } Notification.requestPermission().then((p) => { toast(p === 'granted' ? 'Reminders are on' : 'Reminders were not allowed'); if (p === 'granted') notify('Reminders are on. You will see overdue and skipped-revision alerts when you open the app.'); }); }
+};
+function recordMentalSession(Z,source) {
+  ssc.ensure();
+  Z.qs.forEach((q,i)=>{ const attempt = Z.answers?.[i]; if (!attempt) return;
+    const topic = q.topic || (q.operation === 'percentage' ? 'Percentage' : q.operation === 'fraction' ? 'Simplification' : 'Mental Multiplication');
+    S.practice.push({id:uid(),date:today(),at:Date.now(),subj:'Quant',topic,kind:'original',attempted:1,correct:attempt.ok?1:0,skipped:0,seconds:attempt.seconds,source});
+    if (!attempt.ok) {
+      const prior = S.mistakeBook.find(m=>m.question===q.t && !m.archived);
+      if (prior) { prior.yourAnswer = attempt.value; prior.at = Date.now(); prior.errorCount = (prior.errorCount || 1)+1; }
+      else S.mistakeBook.push({id:uid(),date:today(),at:Date.now(),subj:'Quant',topic,question:q.t,yourAnswer:attempt.value,correctAnswer:q.show,method:q.explanation || 'Review the worked method in this level.',cause:'Unclassified',source:'Original mental maths model — not a PYQ',archived:false});
+    }
+  }); Z.noteMist = true; persist();
+}
+ACT.openTrickLevel = d => { const level = document.querySelector('details.lv[data-level="'+d.level+'"]'); if (level) { level.open = true; level.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}); level.querySelector('summary').focus(); } };
+ACT.revKindFromTricks = d => { show('rev'); ACT.revKind({v:d.kind}); };
+ACT.suggestMathMethod = () => {
+  const box = $('#method-result');
+  try { const result = suggestedMethod(Number($('#method-x').value),Number($('#method-y').value)); box.innerHTML = `<p><b>${esc(result.method)}</b></p><p>${esc(result.reason)}</p><p>Exact product: <b>${result.answer}</b></p>`; }
+  catch (e) { box.textContent = e.message; }
+};
+ACT.masterclassTest = () => {
+  const target = $('#masterclass-test'); if (!target) return;
+  target.innerHTML = '<p class="quiet">Ten model questions with a stopwatch, not a countdown. First question supplied in your text; nine additional questions are based on the worked methods. These are not official PYQs.</p><div id="masterquiz"></div>';
+  const questions = MASTERCLASS_TEST.map(q => ({...q,opts:q.opts ? [...q.opts] : undefined,show:String(q.a)}));
+  quizStart('masterquiz','mental-masterclass',10,{qs:questions,mcq:true,mathTest:true,onDone:Z=>recordMentalSession(Z,'Mental Maths Masterclass model test')});
+  target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
 };
 ACT.mathModelPractice = d => {
   const question = modelExercise(d.id); if (!question) return;
@@ -1209,6 +1240,7 @@ ACT.mathModelPractice = d => {
   }});
 };
 const CHG = {
+  masterclassDay: el => { S.masterclassDays = Array.isArray(S.masterclassDays) ? S.masterclassDays : []; const id = 'day:'+el.dataset.day; S.masterclassDays = S.masterclassDays.filter(day=>day.id!==id); if (el.checked) S.masterclassDays.push({id,date:today(),at:Date.now()}); persist(); },
   tableChoice: el => { clearInterval(QZ.qz?.iv); delete QZ.qz; FL = null; RV[el.dataset.key] = el.dataset.key === 'tableLimit' ? Number(el.value) : el.value; lsSet('sst_tableBase',RV.tableBase); lsSet('sst_tableLimit',String(RV.tableLimit)); render(); if (RV.mode === 'practice') ACT.qzStartRev(); },
   toggleTask: (el) => { const complete = el.checked; setTaskDone(el.dataset.id, complete); render(); if (complete) toast('Lesson achieved — one step closer'); },
   tField: (el) => { T[el.dataset.f] = el.value; },

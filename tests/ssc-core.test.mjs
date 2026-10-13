@@ -21,7 +21,7 @@ test('deletions survive stale reads and conflict with simultaneous edits',()=>{
  const remote=copy(base);remote.todos[0].title='new';assert(mergeStates(base,local,remote).conflicts.length);
 });
 test('unknown baseline is conservative and legacy empty arrays do not cause conflicts',()=>{
- assert(sameState({_u:1,logs:[]},{_u:2,logs:[],practice:[],mistakeBook:[],revisionHistory:[],mockAnalyses:[]}));
+ assert(sameState({_u:1,logs:[]},{_u:2,logs:[],practice:[],mistakeBook:[],revisionHistory:[],mockAnalyses:[],masterclassDays:[]}));
  assert(mergeStates(null,{_u:2,logs:[{id:'local'}]},{_u:1,logs:[]}).conflicts.length);
  assert.equal(mergeStates(null,{_u:0,logs:[]},{_u:4,logs:[{id:'remote'}]}).state.logs[0].id,'remote');
 });

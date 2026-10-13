@@ -1,3 +1,5 @@
+import { MASTERCLASS_ADDITIONS } from './mental-masterclass.js';
+
 /* Original teaching examples and diagrams, not official SSC PYQs. */
 const safe = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function multiplicationQuestions(base,limit,count,random=Math.random) {
@@ -25,6 +27,8 @@ export const VISUAL_TRICKS = {
  'Percentages as fractions': { kind:'bar', steps:['37.5% = 3/8','640 ÷ 8 = 80','3 × 80 = 240'], question:'Find 12.5% of 720.', solution:'12.5% = 1/8 exactly. 720 ÷ 8 = 90.', answer:'90', condition:'16.67% is approximately 1/6 and 33.33% approximately 1/3, not exact equality. Use exact 16⅔% or 33⅓% when specified.' },
  'Simplification order': { steps:['18 ÷ 3 × 2 + 4','6 × 2 + 4','12 + 4','16'], question:'Evaluate 36 ÷ 6 × 3 − 2.', solution:'Division and multiplication have equal priority and run left to right: 6 × 3 − 2 = 16.', answer:'16', condition:'Brackets, powers, multiplication/division left to right, then addition/subtraction left to right.' }
 };
+for (const method of MASTERCLASS_ADDITIONS) VISUAL_TRICKS[method.title] = method;
+
 export const SSC_MATHS = [
  {id:'successive',title:'Successive percentage changes',topic:'Percentage',condition:'Use signed percentages. Equal increases and decreases do not cancel.',steps:['+20%, then −10%','20 − 10 + (20×−10)/100','Net +8%'],question:'A price rises 20%, then falls 10%. What is the net change?',solution:'100 → 120 → 108. Net increase = 8%.',answer:'8% increase',exercise:{t:'A price rises 10%, then falls 10%. Net decrease (%) = ?',a:1}},
  {id:'profit',title:'Profit, loss and discount: choose the correct base',topic:'Profit Loss',condition:'Profit/loss percentage uses cost price. Discount percentage uses marked price.',steps:['CP 800 → MP 1000','10% discount → SP 900','Profit = 900 − 800','100/800 × 100 = 12.5%'],question:'CP is ₹800 and MP is ₹1000. After a 10% discount, find profit %. ',solution:'SP = 1000 × 0.9 = 900. Profit = 100; 100/800 × 100 = 12.5%.',answer:'12.5%',exercise:{t:'CP ₹400; SP ₹460. Profit percentage = ?',a:15}},

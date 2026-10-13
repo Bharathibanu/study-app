@@ -6,7 +6,7 @@ export const clone = value => value == null ? value : JSON.parse(JSON.stringify(
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 const stable = value => value === undefined ? 'undefined' : JSON.stringify(value, (_, v) => object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v);
 export const same = (a,b) => stable(a) === stable(b);
-export function content(state) { const copy = clone(state); if (copy) { delete copy._u; delete copy._sync; for (const key of ['practice','mistakeBook','revisionHistory','mockAnalyses']) if (!copy[key] || Array.isArray(copy[key]) && !copy[key].length) delete copy[key]; } return copy; }
+export function content(state) { const copy = clone(state); if (copy) { delete copy._u; delete copy._sync; for (const key of ['practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays']) if (!copy[key] || Array.isArray(copy[key]) && !copy[key].length) delete copy[key]; } return copy; }
 export const sameState = (a,b) => same(content(a),content(b));
 const identity = (row,path) => row && row.id != null ? String(row.id) : path === 'plan' && row ? [row.date,row.subj,row.topic].join('|') : null;
 export function mergeStates(base, local, remote) {

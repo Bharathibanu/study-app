@@ -51,6 +51,10 @@ Use **Mark as mastered** for a method you understand; this is a personal flag, n
 
 Diagrams use scalable SVG with descriptive labels and inherit the app’s light/dark colours. Worked answers stay behind expandable model-question controls. The app retains reduced-motion support and caches the maths module for offline use.
 
+## Integrated mental maths course
+
+The uploaded masterclass is now merged into these levels, with expanded special multipliers, larger-number methods, a timed test and a seven-day checklist. See [Mental Maths Masterclass](MENTAL_MATHS_MASTERCLASS.md).
+
 ## Verification
 
 Automated checks cover every table 12–30, all 950 mixed extended facts, original shortcut diagram/model coverage and independently computed answers for all 13 interactive SSC models. Browser checks exercise phone/desktop table selection, matching practice/flashcards, diagrams, wrong-answer recording, retry/mastery and offline reload.
