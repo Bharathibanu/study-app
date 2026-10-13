@@ -688,6 +688,51 @@ function splitLine(line) {
   for (let i = 0; i < line.length; i++) { const c = line[i]; if (c === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; } else if (c === sep && !q) { out.push(cur.trim()); cur = ''; } else cur += c; }
   out.push(cur.trim()); return out;
 }
+function lessonTopics(topic) {
+  // A comma followed by words or an ampersand starts a new topic group.
+  return topic.split(/(?<=\d)\s*&\s*|,\s*(?=[A-Za-z])/).flatMap(part => {
+    const match = part.trim().match(/^(.*?)\s+(\d+(?:\s*,\s*\d+)*)$/);
+    if (!match) return part.trim() ? [part.trim()] : [];
+    return [...new Set(match[2].split(',').map(n => match[1] + ' ' + n.trim()))];
+  });
+}
+function splitPlanLessons() {
+  const expanded = [], mappings = new Map();
+  S.plan.forEach(row => {
+    const topics = lessonTopics(row.topic);
+    if (topics.length < 2) { expanded.push(row); return; }
+    const key = row.date + '|' + row.subj + '|' + row.topic;
+    const parent = S.tasks.find(k => k.pk === key);
+    let remaining = parent ? parent.spent : 0;
+    const children = topics.map((topic, i) => {
+      const min = Math.floor(row.min / topics.length) + (i < row.min % topics.length ? 1 : 0);
+      expanded.push({ ...row, topic, min });
+      if (!parent) return null;
+      const spent = Math.min(min, remaining); remaining -= spent;
+      return { ...parent, id: uid(), pk: row.date + '|' + row.subj + '|' + topic, topic, plan: min, spent, done: spent >= min, doneDate: spent >= min ? parent.doneDate || today() : null };
+    }).filter(Boolean);
+    if (parent) mappings.set(parent.id, children);
+  });
+  if (!mappings.size && expanded.length === S.plan.length) return 0;
+  S.plan = expanded;
+  S.tasks = S.tasks.flatMap(task => mappings.get(task.id) || [task]);
+  // Keep total study minutes and spread historical credit across the new tasks.
+  const capacity = new Map([...mappings.values()].flat().map(k => [k.id, k.spent]));
+  S.logs = S.logs.flatMap(log => {
+    const children = mappings.get(log.task); if (!children) return [log];
+    let remaining = log.min;
+    const result = [];
+    children.forEach(child => {
+      const credit = Math.min(remaining, capacity.get(child.id));
+      if (!credit) return;
+      result.push({ ...log, id: uid(), task: child.id, topic: child.topic, min: credit, credit });
+      capacity.set(child.id, capacity.get(child.id) - credit); remaining -= credit;
+    });
+    if (remaining) result.push({ ...log, id: uid(), task: null, min: remaining, credit: 0 });
+    return result;
+  });
+  persist(); genPlan(); return expanded.length;
+}
 function importPlan(text, skipPast) {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean); if (!lines.length) return 0;
   let start = 0; if (/day|subject|topic/i.test(lines[0]) && !/^\d/.test(lines[0])) start = 1;
@@ -700,20 +745,20 @@ function importPlan(text, skipPast) {
   if (!rows.length) return 0;
   if (rows.some((r) => !r.date)) { if (!day1) day1 = today(); rows.forEach((r) => { if (!r.date) r.date = addD(day1, r.day - 1); }); S.settings.day1 = day1; }
   S.plan = rows.sort((a, b) => a.date.localeCompare(b.date) || a.day - b.day);
-  S.planFrom = skipPast ? today() : ''; persist(); genPlan(); return rows.length;
+  S.planFrom = skipPast ? today() : ''; splitPlanLessons(); persist(); genPlan(); return S.plan.length;
 }
 VIEWS.plan = function () {
   const t = today(), has = S.plan.length;
   const total = has ? Math.max(...S.plan.map((r) => r.day)) : 0, cur = has ? Math.max(0, ...S.plan.filter((r) => r.date <= t).map((r) => r.day)) : 0;
   const next = S.plan.filter((r) => r.date >= t).slice(0, 14);
   return `<div class="grid g2">
-  ${card('Your plan', has ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Progress</span><span class="mono">Day ${cur} / ${total}</span></div><div class="bar warnbar"><i style="width:${Math.round(cur / total * 100)}%"></i></div><p class="quiet" style="margin-top:10px">${S.plan.length} plan lines from ${fmtD(S.plan[0].date)} to ${fmtD(S.plan[S.plan.length - 1].date)}. Each day's lines appear in Today's schedule automatically.</p><div class="actions" style="margin-top:12px"><button class="btn sm ghost" data-act="skipToday">Skip today (push plan by 1 day)</button><button class="btn sm ghost" data-act="clearPlan">Remove plan</button></div>` : '<div class="empty"><b>No plan yet</b>Upload your 200-day strategy as a CSV file, or paste it on the right.</div>')}
+  ${card('Your plan', has ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Progress</span><span class="mono">Day ${cur} / ${total}</span></div><div class="bar warnbar"><i style="width:${Math.round(cur / total * 100)}%"></i></div><p class="quiet" style="margin-top:10px">${S.plan.length} plan lines from ${fmtD(S.plan[0].date)} to ${fmtD(S.plan[S.plan.length - 1].date)}. Each day's lines appear in Today's schedule automatically.</p><div class="actions" style="margin-top:12px"><button class="btn sm" data-act="splitLessons">Separate numbered lessons</button><button class="btn sm ghost" data-act="skipToday">Skip today (push plan by 1 day)</button><button class="btn sm ghost" data-act="clearPlan">Remove plan</button></div>` : '<div class="empty"><b>No plan yet</b>Upload your 200-day strategy as a CSV file, or paste it on the right.</div>')}
   ${card('Upload or paste', `<p class="quiet" style="margin-bottom:10px">Columns: Day, Date, Subject, Topic, Planned Hours, Notes. Date is optional if you set Day 1 below. From Excel, use Save As CSV.</p>
   <div class="setrow"><label class="label" for="pfile">CSV file</label><input class="inp" type="file" id="pfile" accept=".csv,.txt,text/csv,text/plain" data-chg="planFile"></div>
   <div class="setrow"><label class="label" for="ptext">Or paste here</label><textarea class="inp" id="ptext" placeholder="1,2026-10-13,Quant,Percentage,2,Basics&#10;1,2026-10-13,Reasoning,Syllogism,1,"></textarea></div>
   <div class="setrow"><label class="label" for="pday1">Day 1 date (used when the file has no dates)</label><input class="inp" type="date" id="pday1" value="${esc(S.settings.day1 || t)}"></div>
   <label class="check" style="margin-bottom:12px"><input type="checkbox" id="pskip" checked>Skip days before today (do not create overdue tasks)</label>
-  <p class="quiet">Your PDF timetable covers Days 1–190. Study time starts at 1 hour per topic; adjust the CSV hours before importing if needed. Days 191–200 were not included in the PDF.</p><div class="actions"><button class="btn" data-act="loadTimetable">Load my timetable</button><a class="btn ghost" href="my-timetable.csv" download>Download my timetable CSV</a></div><div class="actions"><button class="btn" data-act="planPaste">Import</button><button class="btn ghost" data-act="sampleCsv">Download sample CSV</button></div><div class="err" id="perr" style="color:var(--good)"></div>`)}
+  <p class="quiet">Your PDF timetable covers Days 1–190. Numbered lessons become separate tasks. Each original topic group’s estimated hour is divided between its lessons; adjust CSV hours if needed. Days 191–200 were not included in the PDF.</p><div class="actions"><button class="btn" data-act="loadTimetable">Load my timetable</button><a class="btn ghost" href="my-timetable.csv" download>Download my timetable CSV</a></div><div class="actions"><button class="btn" data-act="planPaste">Import</button><button class="btn ghost" data-act="sampleCsv">Download sample CSV</button></div><div class="err" id="perr" style="color:var(--good)"></div>`)}
   </div>
   ${has ? card('Coming up', `<div class="tablewrap"><table><thead><tr><th>Day</th><th>Date</th><th>Subject</th><th>Topic</th><th>Hours</th></tr></thead><tbody>${next.map((r) => `<tr><td class="n">${r.day}</td><td class="n">${fmtD(r.date)}</td><td>${esc(r.subj)}</td><td>${esc(r.topic)}</td><td class="n">${(r.min / 60).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`, ' style="margin-top:14px"') : ''}`;
 };
@@ -1047,6 +1092,7 @@ const ACT = {
   repMode: (d) => { REP.mode = d.v; render(); },
   repDate: (d) => { REP.mode = 'day'; REP.date = d.v; render(); },
   print: () => window.print(),
+  splitLessons: () => { const count = splitPlanLessons(); toast(count ? 'Numbered lessons separated; progress retained' : 'Lessons are already separate'); render(); },
   loadTimetable: async (d, button) => {
     if (S.plan.length && !sure(button, 'Replace existing plan?')) return;
     const day1 = $('#pday1').value || today(), skip = $('#pskip').checked;
