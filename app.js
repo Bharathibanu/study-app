@@ -232,6 +232,7 @@ function toast(msg) {
   clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2600);
 }
 function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const cols = ['var(--accent)', 'var(--teal)', 'var(--c3)', 'var(--c4)', 'var(--good)'];
   for (let i = 0; i < 46; i++) {
     const c = document.createElement('span'); c.className = 'confetti';
@@ -1129,7 +1130,7 @@ const ACT = {
   notif: () => { if (!('Notification' in window)) { toast('This browser does not support reminders'); return; } Notification.requestPermission().then((p) => { toast(p === 'granted' ? 'Reminders are on' : 'Reminders were not allowed'); if (p === 'granted') notify('Reminders are on. You will see overdue and skipped-revision alerts when you open the app.'); }); }
 };
 const CHG = {
-  toggleTask: (el) => { setTaskDone(el.dataset.id, el.checked); render(); },
+  toggleTask: (el) => { const complete = el.checked; setTaskDone(el.dataset.id, complete); render(); if (complete) toast('Lesson achieved — one step closer'); },
   tField: (el) => { T[el.dataset.f] = el.value; },
   mcq: (el) => { RV.mcq = el.checked; if (QZ.qz) QZ.qz.mcq = el.checked; },
   revFilter: (el) => { revFilter = el.value; render(); },

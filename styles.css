@@ -1,10 +1,10 @@
 [hidden] { display: none !important; }
 /* Layout: login > welcome > app shell (sidebar on desktop, bottom bar on phone) with five views: Home, Trendline, Revision, Reports, Tricks */
 :root{
-  --bg:#EDF1EF; --surface:#FFFFFF; --surface2:#E2E9E6; --ink:#12231F; --muted:#586964; --line:#CFD9D5;
-  --teal:#0E6B5B; --teal-ink:#FFFFFF; --accent:#E39A12; --accent-ink:#2A1C00;
+  --bg:#F2F5F1; --surface:#FFFEFA; --surface2:#E7EFEB; --ink:#12231F; --muted:#586964; --line:#CFD9D5;
+  --teal:#0E6B5B; --teal-ink:#FFFFFF; --accent:#B98727; --accent-ink:#2A1C00;
   --good:#1E8E5A; --warn:#B87A00; --bad:#D03B3B; --bad-bg:#FBE9E8;
-  --c1:#0E6B5B; --c2:#E39A12; --c3:#3B7DD8; --c4:#B5516B;
+  --c1:#0E6B5B; --c2:#B98727; --c3:#3B7DD8; --c4:#B5516B;
   --f-display:'Bricolage Grotesque',system-ui,sans-serif; --f-body:'Figtree',system-ui,sans-serif; --f-mono:'IBM Plex Mono',ui-monospace,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
@@ -325,3 +325,24 @@ textarea.inp{min-height:110px;resize:vertical;font-family:var(--f-mono);font-siz
 .dcard .pre{font-size:15px;line-height:1.6}
 
 img.logo{object-fit:cover;display:block;background:#281400}
+
+/* Calm teal and gold: restrained accents and short, accessible transitions. */
+body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var(--accent) 7%,transparent),transparent 55%)}
+.card{box-shadow:0 5px 20px rgba(8,45,37,.035)}
+.hero{background:linear-gradient(125deg,var(--surface),color-mix(in srgb,var(--teal) 8%,var(--surface)));border-top:3px solid var(--accent)}
+.stat{border-top:2px solid color-mix(in srgb,var(--accent) 45%,var(--line))}
+.stat b{color:var(--teal)}
+.side .nav[aria-current=page]{background:color-mix(in srgb,var(--teal) 11%,var(--surface));box-shadow:inset 3px 0 var(--accent)}
+.btn:not(.ghost){box-shadow:0 3px 9px color-mix(in srgb,var(--teal) 16%,transparent)}
+.btn,.icon-btn,.mini,.nav{transition:background-color .18s ease,box-shadow .18s ease,transform .18s ease}
+.btn:active,.icon-btn:active{transform:scale(.98)}
+.bar i{background:linear-gradient(90deg,var(--teal),color-mix(in srgb,var(--teal) 65%,var(--accent)));transition:width .5s ease}
+.bar.bad i{background:var(--bad)}
+.bar.warnbar i{background:var(--accent)}
+.task input:checked+.tick{background:var(--teal);border-color:var(--teal);animation:calmcheck .25s ease}
+@keyframes calmcheck{50%{transform:scale(1.12)}}
+.blob{opacity:.18;animation:none}
+.glyph{animation:none;opacity:.15}
+.flame,.critical{animation:none}
+@media(hover:hover){.btn:hover{box-shadow:0 5px 13px color-mix(in srgb,var(--teal) 18%,transparent)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
