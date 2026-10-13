@@ -46,7 +46,7 @@ p{margin:0}
 .lcard .sub{color:var(--muted);margin-bottom:20px}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
 .field .box{display:flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding-right:6px}
-.field input[type=text],.field input[type=password]{flex:1;min-width:0;border:0;background:transparent;padding:13px 14px;outline:0}
+.field input[type=text],.field input[type=email],.field input[type=password]{flex:1;min-width:0;border:0;background:transparent;padding:13px 14px;outline:0}
 .field .box:focus-within{border-color:var(--teal);box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 22%,transparent)}
 .eye{border:0;background:transparent;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
 .eye:hover{color:var(--ink);background:var(--surface2)}
@@ -238,7 +238,7 @@ body{padding:0}
   .nav.moreb{display:flex}
   .fab{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 }
-.field input[type=text],.field input[type=password]{font-size:16px}
+.field input[type=text],.field input[type=email],.field input[type=password]{font-size:16px}
 .sheet input:not([type=checkbox]),.sheet select,.sheet textarea,.inp{width:100%;font-size:16px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);outline:0}
 .sheet input:focus,.sheet select:focus,.sheet textarea:focus,.inp:focus{border-color:var(--teal);box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 22%,transparent)}
 .modal{position:fixed;inset:0;z-index:70;background:rgba(5,15,12,.55);display:flex;align-items:flex-end;justify-content:center;animation:wfade .2s both}
