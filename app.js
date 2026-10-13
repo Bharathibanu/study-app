@@ -2,6 +2,8 @@
    Data lives in one object (S). It is saved on this device (localStorage)
    and, if Firebase is set up, synced to your account so phone and PC match. */
 import * as cloud from './cloud.js';
+import { installSsc } from './ssc.js';
+import { clone, sameState, mergeStates } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -70,6 +72,11 @@ const NAV = [
   { id: 'study', label: 'Study Timer' },
   { id: 'revlog', label: 'Revision Log' },
   { id: 'plan', label: 'SSC Plan' },
+  { id: 'practice', label: 'Topic Practice' },
+  { id: 'mistakes', label: 'Mistake Notebook' },
+  { id: 'revisionQueue', label: 'Revision Queue' },
+  { id: 'mockAnalysis', label: 'CGL Mock Analysis' },
+  { id: 'pyq', label: '2024–2025 PYQ Bank' },
   { id: 'todo', label: 'To-Do' },
   { id: 'learn', label: 'Learning' },
   { id: 'diary', label: 'Diary' },
@@ -82,6 +89,9 @@ const NAV = [
 ];
 const TITLES = { home: 'Home', trend: 'Trendline', rev: 'Quick Revision', rep: 'Reports', study: 'Study Timer', revlog: 'Revision Log', plan: 'SSC 200-Day Plan', tricks: 'Multiplication Tricks', todo: 'To-Do', learn: 'Learning', diary: 'Personal Diary', canteen: 'DHANAM Canteen', money: 'Money & Meetings', mocks: 'Mock Tests', notes: 'Notes & Formulas', set: 'Settings', more: 'More' };
 
+Object.assign(ICON, { practice: ICON.rev, mistakes: ICON.notes, revisionQueue: ICON.revlog, mockAnalysis: ICON.mocks, pyq: ICON.plan });
+Object.assign(TITLES, { practice: 'SSC CGL Topic Practice', mistakes: 'Mistake Notebook', revisionQueue: 'Automatic Revision Queue', mockAnalysis: 'CGL Mock Analysis', pyq: '2024–2025 SSC PYQ Bank' });
+
 /* =============== State =============== */
 let S = null, KEY = 'sst_state_local', UID = null, saveT = null, CUR = 'home', welcomeNext = false;
 
@@ -89,6 +99,7 @@ const blank = () => ({
   v: 1, _u: 0, created: today(), name: '',
   settings: { target: 6, budget: 6000, exam: '', pomo: 25, brk: 5, why: '', day1: '' },
   plan: [], planFrom: '', tasks: [], logs: [], rev: [], exp: [], meet: [], qr: [], mist: [], mocks: [], notes: [], mastered: {},
+  practice: [], mistakeBook: [], revisionHistory: [], mockAnalyses: [],
   canteen: { prices: { tea: 12, snack: 10, lunch: 52 }, days: {} }, todos: [], books: [], learn: [], diary: []
 });
 function loadLocal() {
@@ -99,27 +110,83 @@ function loadLocal() {
   S.settings = Object.assign(blank().settings, (r && r.settings) || {});
 }
 function setSync(t) { const el = $('#sync'); if (el) el.textContent = t; }
+const syncState = { base: null, legacyCandidate: null, dirty: false, saving: false, generation: 0, unsubscribe: null, conflict: null, problem: '', acknowledged: '' };
+function applyAccount(value) {
+  S = Object.assign(blank(), value || {});
+  S.settings = Object.assign(blank().settings, value?.settings || {});
+  ssc.ensure(); lsSet(KEY, JSON.stringify(S));
+}
 function persist() {
   S._u = Date.now();
   lsSet(KEY, JSON.stringify(S));
   if (UID && cloud.enabled) {
-    clearTimeout(saveT);
-    saveT = setTimeout(() => {
-      setSync('Syncing...');
-      cloud.save(UID, S).then(() => setSync('Synced')).catch(() => setSync('Offline, will sync later'));
-    }, 700);
+    syncState.dirty = true;
+    setSync(syncState.conflict ? 'Conflict · changes saved locally' : navigator.onLine ? 'Saved locally · syncing…' : 'Saved locally · offline');
+    clearTimeout(saveT); saveT = setTimeout(() => syncAccount(), 700);
   }
 }
-function onRemote(data) {
-  if (!data) return;
-  let r; try { r = JSON.parse(data.data); } catch (e) { return; }
-  if (r && r._u < S._u) { cloud.save(UID, S).catch(() => {}); return; }
-  if (r && r._u > S._u) {
-    S = Object.assign(blank(), r);
-    S.settings = Object.assign(blank().settings, r.settings || {});
-    lsSet(KEY, JSON.stringify(S));
-    dataChanged(); setSync('Synced');
+function syncFailure(error) {
+  if (error?.code === 'sync/conflict') {
+    syncState.conflict = { remote: error.remote, paths: error.conflicts };
+    lsSet(KEY + '_conflict_device', JSON.stringify(S));
+    lsSet(KEY + '_conflict_server', JSON.stringify(error.remote));
+    setSync('Conflict · review copies');
+  } else if (['sync/size','sync/corrupt','permission-denied'].includes(error?.code)) {
+    syncState.problem = error.code === 'permission-denied' ? 'Firebase refused this save. Check sign-in and database rules; your device copy is retained.' : error.message;
+    setSync('Save needs attention');
+  } else { syncState.problem = ''; setSync('Saved locally · waiting for server'); }
+  if (!$('#app').hidden && $('#modal').hidden) render();
+}
+async function syncAccount(force = false) {
+  if (!UID || !cloud.enabled || syncState.saving || (syncState.conflict && !force) || !syncState.dirty) return;
+  if (!navigator.onLine) { setSync('Saved locally · offline'); return; }
+  const account = UID, generation = syncState.generation, sent = clone(S), base = clone(syncState.base);
+  syncState.saving = true; setSync('Syncing with server…');
+  try {
+    const saved = await cloud.save(account, sent, base, force);
+    if (account !== UID || generation !== syncState.generation) return;
+    const remaining = mergeStates(sent,S,saved);
+    syncState.base = saved; lsSet(KEY + '_server',JSON.stringify(saved));
+    if (remaining.conflicts.length) {
+      const error = new Error('Local data changed during save.'); error.code = 'sync/conflict'; error.remote = saved; error.conflicts = remaining.conflicts; throw error;
+    }
+    applyAccount(remaining.state); syncState.dirty = !sameState(S,saved);
+    syncState.conflict = null; syncState.problem = '';
+    syncState.acknowledged = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    setSync(syncState.dirty ? 'Saved locally · syncing…' : 'Synced · server confirmed');
+    if (!$('#app').hidden && $('#modal').hidden) render();
+  } catch (error) { if (account === UID && generation === syncState.generation) syncFailure(error); }
+  finally {
+    if (account === UID && generation === syncState.generation) {
+      syncState.saving = false;
+      if (syncState.dirty && !syncState.conflict && !syncState.problem) { clearTimeout(saveT); saveT = setTimeout(() => syncAccount(), 15000); }
+    }
   }
+}
+function onRemote(data, fromCache = false) {
+  if (syncState.saving || syncState.conflict) return;
+  let remote = null;
+  if (data) { try { remote = JSON.parse(data.data); } catch { syncState.problem = 'The cloud record cannot be read. Export your device backup before recovery.'; setSync('Save needs attention'); return; } }
+  if (fromCache) { setSync(syncState.dirty ? 'Saved locally · awaiting server' : 'Cached data · awaiting server'); return; }
+  if (!remote) { syncState.dirty = true; syncAccount(); return; }
+  if (!syncState.base && sameState(syncState.legacyCandidate,remote)) { syncState.base = remote; lsSet(KEY + '_server',JSON.stringify(remote)); }
+  if (sameState(S,remote)) {
+    syncState.base = remote; lsSet(KEY + '_server',JSON.stringify(remote)); syncState.dirty = false;
+    setSync('Synced · server confirmed'); return;
+  }
+  const merged = mergeStates(syncState.base,S,remote);
+  if (merged.conflicts.length) { const error = new Error('Conflicting device copies.'); error.code = 'sync/conflict'; error.remote = remote; error.conflicts = merged.conflicts; syncFailure(error); return; }
+  // Keep the previous baseline when local edits exist; the transaction performs the merge atomically.
+  if (syncState.dirty || (syncState.base && !sameState(S,syncState.base))) { syncState.dirty = true; syncAccount(); return; }
+  syncState.base = remote; lsSet(KEY + '_server',JSON.stringify(remote)); applyAccount(merged.state);
+  syncState.dirty = !sameState(S,remote); dataChanged();
+  if (syncState.dirty) syncAccount(); else setSync('Synced · server confirmed');
+}
+function syncBanner() {
+  if (!UID) return '';
+  if (syncState.conflict) return `<div class="sync-banner" role="alert"><b>Two device copies need review</b><p>Both devices changed the same record. Automatic overwrite is paused. Export both copies before choosing which account copy to keep. This choice replaces the whole cloud/device account state.</p><div class="actions"><button class="btn sm ghost" data-act="syncExportDevice">Export this device copy</button><button class="btn sm ghost" data-act="syncExportServer">Export server copy</button><button class="btn sm" data-act="syncUseServer">Use server copy</button><button class="btn sm ghost" data-act="syncUseDevice">Keep device copy</button></div></div>`;
+  if (syncState.problem) return `<div class="sync-banner" role="alert"><p>${esc(syncState.problem)}</p><button class="btn sm" data-act="syncRetry">Retry save</button><button class="btn sm ghost" data-act="exportData">Export backup</button></div>`;
+  return '';
 }
 function dataChanged() { rollover(); genPlan(); if (!$('#app').hidden && $('#modal').hidden && CUR !== 'study') render(); }
 
@@ -132,7 +199,7 @@ function genPlan() {
     const pk = r.date + '|' + r.subj + '|' + r.topic;
     if (have.has(pk)) return;
     have.add(pk);
-    S.tasks.push({ id: uid(), pk, orig: r.date, date: r.date, subj: r.subj, topic: r.topic, plan: r.min, spent: 0, done: false, doneDate: null });
+    S.tasks.push({ id: 'plan:' + pk, pk, orig: r.date, date: r.date, subj: r.subj, topic: r.topic, plan: r.min, spent: 0, done: false, doneDate: null });
     n++;
   });
   if (n) persist();
@@ -344,7 +411,7 @@ function render() {
   });
   $('#vtitle').textContent = TITLES[CUR] || '';
   const fn = VIEWS[CUR] || VIEWS.home;
-  $('#view').innerHTML = `<div class="view">${['home','study','trend','rep','plan','rev','revlog','mocks','learn'].includes(CUR) ? planTracking() : ''}${fn()}</div>`;
+  $('#view').innerHTML = `<div class="view">${syncBanner()}${['home','study','trend','rep','plan','rev','revlog','mocks','learn'].includes(CUR) ? planTracking() : ''}${CUR === 'home' ? ssc.dailyHTML() : ''}${fn()}</div>`;
   const after = AFTER[CUR]; if (after) after();
 }
 const AFTER = {};
@@ -385,7 +452,7 @@ VIEWS.home = function () {
   const taskRows = tk.length ? tk.map((k) => {
     const c = carried(k), tag = !k.done && c ? `<span class="badge amber" style="margin-left:6px">${c === 1 ? 'Carried from yesterday' : 'Carried ' + c + ' days'}</span>` : '';
     const left = k.plan - k.spent, partial = !k.done && k.spent > 0 ? ` · ${left} min left` : '';
-    return `<div class="trow"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${k.id}"${k.done ? ' checked' : ''}><span class="tick">${ICON.chk}</span><span class="t"><b>${esc(k.subj)}${tag}</b><span>${esc(k.topic)}${partial}</span></span><span class="m">${k.plan} min</span></label>${k.done ? '' : `<button class="mini" data-act="partial" data-id="${k.id}" title="Log part of this task" aria-label="Log part done">Part</button>`}<button class="mini del" data-act="delTask" data-id="${k.id}" title="Remove" aria-label="Remove task">&times;</button></div>`;
+    return `<div class="trow"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${k.id}"${k.done ? ' checked' : ''}><span class="tick">${ICON.chk}</span><span class="t"><b>${esc(k.subj)}${tag}</b><span>${esc(k.topic)}${partial}</span></span><span class="m">${k.plan} min</span></label>${k.done ? '' : `<button class="mini" data-act="partial" data-id="${k.id}" title="Log part of this task" aria-label="Log part done">Part</button>`}<button class="mini" data-act="sscTopicPractice" data-topic="${esc(k.topic)}" data-subj="${esc(k.subj)}">Practice</button><button class="mini del" data-act="delTask" data-id="${k.id}" title="Remove" aria-label="Remove task">&times;</button></div>`;
   }).join('') : `<div class="empty"><b>Nothing planned for today</b>Add a task, or upload your 200-day plan so each day fills in by itself.<div class="actions" style="justify-content:center;margin-top:10px"><button class="btn sm" data-act="addTask">Add task</button><button class="btn sm ghost" data-act="nav" data-v="plan">Upload plan</button></div></div>`;
 
   const cT = cTotal(t);
@@ -829,7 +896,7 @@ VIEWS.money = function () {
 VIEWS.mocks = function () {
   const ms = S.mocks.slice().sort((a, b) => a.date.localeCompare(b.date)), pct = ms.map((m) => Math.round(m.score / m.max * 100));
   const chart = ms.length > 1 ? lineSVG(pct, ms.map((m, i) => (i % Math.ceil(ms.length / 6) === 0 || i === ms.length - 1 ? fmtD(m.date) : '')), { max: 100, step: 25, trend: true, aria: 'Mock test score percentage' }) : '<p class="quiet">Log at least two mock tests to see the trend.</p>';
-  return `${card('Score trend (percent)', chart + (ms.length ? `<p class="quiet" style="margin-top:8px">Best ${Math.max(...pct)}% · Latest ${pct[pct.length - 1]}% · Average ${Math.round(sum(pct) / pct.length)}%</p>` : ''))}
+  return `${card('CGL section analysis', '<p class="quiet">Track negative marks, skipped questions, section accuracy and weak topics.</p><button class="btn sm" data-act="nav" data-v="mockAnalysis">Open CGL Mock Analysis</button>')}${card('Score trend (percent)', chart + (ms.length ? `<p class="quiet" style="margin-top:8px">Best ${Math.max(...pct)}% · Latest ${pct[pct.length - 1]}% · Average ${Math.round(sum(pct) / pct.length)}%</p>` : ''))}
   <div class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Mock test log</h3><button class="btn sm" data-act="addMock">Log mock test</button></div>${ms.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Test</th><th>Score</th><th>Percent</th><th>Time</th><th>Notes</th><th></th></tr></thead><tbody>${ms.slice().reverse().map((m) => `<tr><td class="n">${fmtD(m.date)}</td><td>${esc(m.name)}</td><td class="n">${m.score} / ${m.max}</td><td class="n">${Math.round(m.score / m.max * 100)}%</td><td class="n">${m.mins ? m.mins + ' min' : '-'}</td><td>${esc(m.notes || '')}</td><td><button class="mini del" data-act="delMock" data-id="${m.id}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No mock tests yet</b>Write what went wrong in the notes column. It becomes your revision list.</div>'}</div>`;
 };
 
@@ -1303,9 +1370,13 @@ $('#lform').addEventListener('submit', async (e) => {
 });
 function startSession(name, uidv) {
   UID = uidv; KEY = uidv ? 'sst_state_' + uidv : 'sst_state_local';
-  loadLocal(); if (!S.name) S.name = name || ''; const pn = lsGet('sst_pendingname'); if (pn && uidv) { S.name = pn; lsDel('sst_pendingname'); }
+  clearTimeout(saveT); syncState.unsubscribe?.(); syncState.generation++; syncState.saving = false; syncState.conflict = null; syncState.problem = '';
+  loadLocal(); syncState.legacyCandidate = clone(S); ssc.resetSession(); ssc.ensure();
+  try { syncState.base = JSON.parse(lsGet(KEY + '_server') || 'null'); } catch { syncState.base = null; }
+  syncState.dirty = syncState.base ? !sameState(S,syncState.base) : S._u > 0;
+  if (!S.name) S.name = name || ''; const pn = lsGet('sst_pendingname'); if (pn && uidv) { S.name = pn; lsDel('sst_pendingname'); }
   rollover(); genPlan();
-  if (uidv && cloud.enabled) { setSync('Syncing...'); cloud.subscribe(uidv, (data, pending, err) => { if (err) { setSync('Offline, will sync later'); return; } if (data) onRemote(data); else if (!pending) cloud.save(uidv, S).catch(() => {}); if (!pending) setSync('Synced'); }); }
+  if (uidv && cloud.enabled) { setSync('Checking server…'); const generation = syncState.generation; syncState.unsubscribe = cloud.subscribe(uidv, (data, pending, err, fromCache) => { if (UID !== uidv || generation !== syncState.generation) return; if (err) { syncState.problem = 'Could not read Firebase. Check sign-in and database rules; the local copy is retained.'; setSync('Cloud read needs attention'); if (!$('#app').hidden) render(); return; } if (pending) { setSync('Saved locally · awaiting server'); return; } onRemote(data, fromCache); }); }
   else setSync('This device only');
   if (welcomeNext) { welcomeNext = false; runWelcome(); } else enterApp();
 }
@@ -1330,10 +1401,33 @@ function remind() {
   if (c) notify(c + ' item' + (c > 1 ? 's' : '') + ' in the Critical Zone need attention.'); else if (m === 1) notify('You skipped Quick Revision yesterday. Do a set today to keep your streak.');
 }
 async function logout() {
+  clearTimeout(saveT); syncState.unsubscribe?.(); syncState.unsubscribe = null; syncState.generation++; syncState.saving = false;
   lsDel('sst_rem'); ssDel('sst_ses'); clearInterval(T.iv); T.running = false; T.iv = null; clearInterval(remIv);
   if (cloud.enabled) { try { await cloud.signOut(); } catch (e) { /* ignore */ } }
   $('#app').hidden = true; $('#login').hidden = false; $('#pass').value = ''; signup = false; loginMode(); UID = null;
 }
+ACT.syncRetry = () => { syncState.problem = ''; syncState.dirty = true; syncAccount(); };
+ACT.syncExportDevice = () => download('study-device-copy-' + today() + '.json',JSON.stringify(S,null,2),'application/json');
+ACT.syncExportServer = () => download('study-server-copy-' + today() + '.json',JSON.stringify(syncState.conflict?.remote || syncState.base,null,2),'application/json');
+ACT.syncUseServer = async () => {
+  if (!confirm('Replace this device’s active records with a fresh server copy? Export the device copy first.')) return;
+  const account = UID;
+  try {
+    const remote = await cloud.readServer(account); if (UID !== account) return;
+    if (!remote) { toast('No server copy exists.'); return; }
+    lsSet(KEY + '_conflict_device',JSON.stringify(S)); syncState.base = remote;
+    lsSet(KEY + '_server',JSON.stringify(remote)); applyAccount(remote); syncState.dirty = false; syncState.conflict = null; syncState.problem = '';
+    setSync('Synced · server confirmed'); dataChanged(); render();
+  } catch { toast('Could not read a fresh server copy. Retry when online.'); }
+};
+ACT.syncUseDevice = () => {
+  if (!confirm('Replace the whole cloud account with this device copy? Export both copies first. Other devices’ conflicting changes will be replaced.')) return;
+  syncState.dirty = true; syncAccount(true);
+};
+window.addEventListener('online', () => { if (UID && syncState.dirty) syncAccount(); });
+window.addEventListener('offline', () => { if (UID) setSync(syncState.dirty ? 'Saved locally · offline' : 'Offline · using device copy'); });
+const ssc = installSsc({ state: () => S, persist, render, show, card, esc, today, uid, openForm, toast, ACT, CHG, VIEWS, download, current: () => CUR });
+
 async function boot() {
   applyTheme(); $('#eye').innerHTML = ICON.eye;
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./sw.js').catch(() => {});
@@ -1345,7 +1439,7 @@ async function boot() {
   try {
     await cloud.init();
     cloud.onUser((user) => {
-      if (user) { if (!UID) startSession((user.email || '').split('@')[0], user.uid); } else { if (UID) { UID = null; } if (!$('#app').hidden) { $('#app').hidden = true; $('#login').hidden = false; } }
+      if (user) { if (!UID) startSession((user.email || '').split('@')[0], user.uid); } else { if (UID) { clearTimeout(saveT); syncState.unsubscribe?.(); syncState.unsubscribe = null; syncState.generation++; syncState.saving = false; UID = null; } if (!$('#app').hidden) { $('#app').hidden = true; $('#login').hidden = false; } }
     });
   } catch (e) {
     $('#err').textContent = 'Could not load sign-in. Check your internet connection and refresh.';

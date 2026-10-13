@@ -346,3 +346,22 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 .flame,.critical{animation:none}
 @media(hover:hover){.btn:hover{box-shadow:0 5px 13px color-mix(in srgb,var(--teal) 18%,transparent)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* SSC preparation tools */
+.ssc-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.ssc-question{margin:18px 0;white-space:pre-wrap}
+.ssc-options{display:grid;gap:10px;margin:16px 0}
+.ssc-answer{text-align:left;white-space:normal;min-height:48px;justify-content:flex-start}
+.ssc-feedback{background:var(--surface2);border-left:3px solid var(--accent);border-radius:12px;padding:14px;margin:16px 0}
+.ssc-feedback p{margin:8px 0}
+.ssc-mistake{border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.ssc-mistake summary{cursor:pointer;font-weight:600}
+.ssc-mistake p{margin:10px 0;overflow-wrap:anywhere}
+.ssc-daily{padding-left:22px;margin:12px 0}.ssc-daily li{padding:8px 0}
+.ssc-daily .btn{margin:4px 0 4px 6px}
+.ssc-filters input,.ssc-filters select{min-width:0;width:100%}
+.sync-banner{border:1px solid var(--warn);background:var(--surface2);padding:14px;border-radius:14px;margin-bottom:14px}
+.sync-banner p{margin-bottom:8px}
+@media(max-width:480px){.ssc-filters{grid-template-columns:1fr}.ssc-daily .btn{margin-left:0}.li{flex-wrap:wrap}}
+
+@media(max-width:480px){.trow{flex-wrap:wrap;padding-bottom:8px}.trow .task{flex-basis:100%}.trow .mini{min-height:36px}.ssc-options .ssc-answer{overflow-wrap:anywhere}}

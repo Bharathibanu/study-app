@@ -1,0 +1,261 @@
+{
+  "description": "Original practice questions written for this app. These are NOT previous-year exam questions.",
+  "questions": [
+    {
+      "id": "original-001",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Reasoning",
+      "topic": "Number Series",
+      "question": "Find the next term: 3, 7, 13, 21, ?",
+      "options": [
+        "27",
+        "29",
+        "31",
+        "33"
+      ],
+      "answer": 2,
+      "explanation": "The differences are 4, 6 and 8. The next difference is 10, so 21 + 10 = 31."
+    },
+    {
+      "id": "original-002",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Reasoning",
+      "topic": "Number Series",
+      "question": "Find the next term: 2, 6, 18, 54, ?",
+      "options": [
+        "108",
+        "126",
+        "162",
+        "216"
+      ],
+      "answer": 2,
+      "explanation": "Each term is multiplied by 3. 54 × 3 = 162."
+    },
+    {
+      "id": "original-003",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Reasoning",
+      "topic": "Coding Decoding",
+      "question": "If CAT is written as DBU by moving each letter one step forward, how is DOG written?",
+      "options": [
+        "EPH",
+        "CNG",
+        "EOG",
+        "FPH"
+      ],
+      "answer": 0,
+      "explanation": "D → E, O → P and G → H, giving EPH."
+    },
+    {
+      "id": "original-004",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Reasoning",
+      "topic": "Blood Relation",
+      "question": "Asha is the sister of Ravi. Ravi is the father of Meena. How is Asha related to Meena?",
+      "options": [
+        "Mother",
+        "Aunt",
+        "Sister",
+        "Grandmother"
+      ],
+      "answer": 1,
+      "explanation": "The sister of Meena’s father is her aunt."
+    },
+    {
+      "id": "original-005",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Quant",
+      "topic": "Percentage",
+      "question": "A price of ₹800 is increased by 15%. What is the new price?",
+      "options": [
+        "₹880",
+        "₹900",
+        "₹920",
+        "₹960"
+      ],
+      "answer": 2,
+      "explanation": "15% of 800 is 120. The new price is 800 + 120 = ₹920."
+    },
+    {
+      "id": "original-006",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Quant",
+      "topic": "Profit Loss",
+      "question": "An item costing ₹500 is sold for ₹575. What is the profit percentage?",
+      "options": [
+        "10%",
+        "12%",
+        "15%",
+        "20%"
+      ],
+      "answer": 2,
+      "explanation": "Profit = 575 − 500 = 75. Profit percentage = 75/500 × 100 = 15%."
+    },
+    {
+      "id": "original-007",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Quant",
+      "topic": "Time & Work",
+      "question": "A can complete a job in 12 days and B in 6 days. How many days do they need together?",
+      "options": [
+        "3",
+        "4",
+        "6",
+        "9"
+      ],
+      "answer": 1,
+      "explanation": "Their combined daily rate is 1/12 + 1/6 = 1/4, so they need 4 days."
+    },
+    {
+      "id": "original-008",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "Quant",
+      "topic": "Ratio",
+      "question": "₹450 is divided between A and B in the ratio 2:3. What is B’s share?",
+      "options": [
+        "₹150",
+        "₹180",
+        "₹250",
+        "₹270"
+      ],
+      "answer": 3,
+      "explanation": "There are 5 equal parts. B gets 3/5 × 450 = ₹270."
+    },
+    {
+      "id": "original-009",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "English",
+      "topic": "Verb",
+      "question": "Choose the correct sentence.",
+      "options": [
+        "She go to school daily.",
+        "She goes to school daily.",
+        "She going to school daily.",
+        "She gone to school daily."
+      ],
+      "answer": 1,
+      "explanation": "In the simple present, the third-person singular subject “she” takes “goes”."
+    },
+    {
+      "id": "original-010",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "English",
+      "topic": "Preposition",
+      "question": "Fill the blank: He is interested ___ learning languages.",
+      "options": [
+        "at",
+        "on",
+        "in",
+        "for"
+      ],
+      "answer": 2,
+      "explanation": "The standard expression is “interested in”."
+    },
+    {
+      "id": "original-011",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "English",
+      "topic": "Article",
+      "question": "Fill the blank: She bought ___ umbrella.",
+      "options": [
+        "a",
+        "an",
+        "the only",
+        "no article"
+      ],
+      "answer": 1,
+      "explanation": "“Umbrella” starts with a vowel sound, so the indefinite article is “an”."
+    },
+    {
+      "id": "original-012",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "English",
+      "topic": "OWS",
+      "question": "Choose the word for a person who studies plants.",
+      "options": [
+        "Geologist",
+        "Botanist",
+        "Astronomer",
+        "Zoologist"
+      ],
+      "answer": 1,
+      "explanation": "A botanist studies plants. A zoologist studies animals."
+    },
+    {
+      "id": "original-013",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "General Studies",
+      "topic": "Polity",
+      "question": "Fundamental Rights in the Constitution of India are primarily contained in which Part?",
+      "options": [
+        "Part I",
+        "Part II",
+        "Part III",
+        "Part IV"
+      ],
+      "answer": 2,
+      "explanation": "Part III contains Fundamental Rights. Part IV contains the Directive Principles of State Policy."
+    },
+    {
+      "id": "original-014",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "General Studies",
+      "topic": "History",
+      "question": "Who was the first President of independent India?",
+      "options": [
+        "Jawaharlal Nehru",
+        "Dr Rajendra Prasad",
+        "Sardar Vallabhbhai Patel",
+        "Dr S Radhakrishnan"
+      ],
+      "answer": 1,
+      "explanation": "Dr Rajendra Prasad served as India’s first President."
+    },
+    {
+      "id": "original-015",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "General Studies",
+      "topic": "Physics",
+      "question": "What is the SI unit of force?",
+      "options": [
+        "Joule",
+        "Watt",
+        "Pascal",
+        "Newton"
+      ],
+      "answer": 3,
+      "explanation": "The SI unit of force is the newton (N)."
+    },
+    {
+      "id": "original-016",
+      "kind": "original",
+      "exam": "CGL",
+      "subj": "General Studies",
+      "topic": "Biology",
+      "question": "Which cell organelle is commonly called the powerhouse of the cell?",
+      "options": [
+        "Nucleus",
+        "Ribosome",
+        "Mitochondrion",
+        "Golgi apparatus"
+      ],
+      "answer": 2,
+      "explanation": "Mitochondria generate much of a cell’s usable energy through cellular respiration."
+    }
+  ]
+}

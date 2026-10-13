@@ -7,6 +7,8 @@ This guide explains the current study app in plain language, with technical deta
 - Firebase project: `studyapp-tracker`
 - Platform: static browser app, installable as a Progressive Web App (PWA).
 
+For the new SSC CGL features and revised sync design, see [SSC CGL preparation tools](SSC_CGL_FEATURES.md).
+
 ## Contents
 
 1. Architecture and vocabulary
@@ -130,7 +132,7 @@ Uses study logs to show a recent-hours chart, averages, week-to-week direction, 
 
 ### Quick Revision
 
-Offers generated short arithmetic drills, learning examples, practice, multiple-choice options and flashcards. Quiz state tracks answers, score and timing. Finished drills enter the quick-revision history; incorrect answers can become mistakes to revisit. These drills do not automatically complete SSC timetable lessons.
+Offers generated short arithmetic drills, learning examples, practice, multiple-choice options and flashcards. Quiz state tracks answers, score and timing. Finished drills enter the quick-revision history; incorrect answers can become mistakes to revisit. These drills do not automatically complete SSC timetable lessons. New Topic Practice, Mistake Notebook, Revision Queue, CGL Mock Analysis and PYQ Bank pages are described in the linked SSC guide.
 
 ### Revision Log
 
@@ -240,6 +242,8 @@ Timer state (`T`), quiz state (`QZ`), filters and the current view are runtime v
 | `plan`, `planFrom` | Imported schedule and skip-past cutoff |
 | `tasks` | Generated/manual study tasks and recorded achievement |
 | `logs` | Study sessions and automatic completion logs |
+| `practice`, `mistakeBook` | Question attempts and classified mistake entries |
+| `revisionHistory`, `mockAnalyses` | Spaced-review stages and detailed mock sections |
 | `rev`, `qr`, `mist` | Revision records, quick-drill history and mistakes |
 | `mocks` | Mock test results |
 | `exp`, `meet` | Expenses and meetings |
@@ -288,18 +292,11 @@ The app requests notifications if you choose reminders. It does not include inte
 
 There are three separate storage layers: cached app files, browser localStorage state and Firestore’s persistent cache where supported. A previously loaded and authenticated device can often continue offline, but new sign-in requires network access and missing SDK/assets may prevent offline startup. Not every offline scenario has been verified.
 
-`persist()` updates `_u`, saves local JSON and debounces a cloud save by approximately 700 ms. Successful cloud write promises update the sync label. `onRemote()` compares client timestamps and replaces state with a newer remote snapshot, or attempts to send newer local state.
+`persist()` saves local JSON and schedules a cloud transaction. The app now compares a saved baseline, local edits and current server data rather than choosing a winner by client clock. Independent changes can merge; same-field and delete-versus-edit conflicts pause for review. Recovery controls export both copies before choosing a whole-account replacement.
 
-Important current limitations:
+Cached snapshots do not confirm a server save. The label now distinguishes local/offline changes, awaiting-server data, confirmed synchronization, and conflicts. `serverUpdated` is a Firestore server timestamp; `updated` retains its client-time compatibility value.
 
-- The whole state is replaced as one document; concurrent edits can overwrite each other.
-- Client clock differences can affect “newer” comparisons.
-- A cached snapshot can cause “Synced” to appear without proving a fresh server acknowledgement.
-- Some save errors are caught without detailed user diagnostics.
-- Firestore documents have a roughly 1 MiB size limit; very large diaries/log histories can outgrow this design.
-- Clearing local storage before a successful sync can lose pending changes.
-
-Use one device at a time when offline, reconnect and verify changes on another device, and retain backups. Do not describe the existing implementation as conflict-free or a guaranteed delivery system.
+Transactions require network access; offline changes stay in localStorage and retry later. The account remains one document with a conservative size guard. Older app versions can still overwrite data, so update all devices. Keep backups and avoid simultaneous offline edits to the same record. See the SSC guide for precise recovery steps and test limits.
 
 ## 9. Backups and recovery
 
@@ -370,189 +367,235 @@ The following inventory links current functions to source lines and groups butto
 
 | Name | Source |
 |---|---|
-| `rng` | [app.js line 32](../app.js#L32) |
-| `loadLocal` | [app.js line 94](../app.js#L94) |
-| `setSync` | [app.js line 101](../app.js#L101) |
-| `persist` | [app.js line 102](../app.js#L102) |
-| `onRemote` | [app.js line 113](../app.js#L113) |
-| `dataChanged` | [app.js line 124](../app.js#L124) |
-| `genPlan` | [app.js line 127](../app.js#L127) |
-| `planTracking` | [app.js line 141](../app.js#L141) |
-| `rollover` | [app.js line 163](../app.js#L163) |
-| `todayTasks` | [app.js line 169](../app.js#L169) |
-| `critItems` | [app.js line 174](../app.js#L174) |
-| `qrMissed` | [app.js line 180](../app.js#L180) |
-| `streak` | [app.js line 194](../app.js#L194) |
-| `bestStreak` | [app.js line 198](../app.js#L198) |
-| `gamify` | [app.js line 203](../app.js#L203) |
-| `setTaskDone` | [app.js line 214](../app.js#L214) |
-| `toast` | [app.js line 230](../app.js#L230) |
-| `confetti` | [app.js line 234](../app.js#L234) |
-| `openForm` | [app.js line 246](../app.js#L246) |
-| `openMenu` | [app.js line 265](../app.js#L265) |
-| `lineSVG` | [app.js line 292](../app.js#L292) |
-| `barsSVG` | [app.js line 309](../app.js#L309) |
-| `donutSVG` | [app.js line 319](../app.js#L319) |
-| `buildNav` | [app.js line 328](../app.js#L328) |
-| `show` | [app.js line 336](../app.js#L336) |
-| `render` | [app.js line 339](../app.js#L339) |
-| `VIEWS.home` | [app.js line 365](../app.js#L365) |
-| `tReset` | [app.js line 426](../app.js#L426) |
-| `tTick` | [app.js line 427](../app.js#L427) |
-| `tPaint` | [app.js line 437](../app.js#L437) |
-| `beep` | [app.js line 442](../app.js#L442) |
-| `saveSession` | [app.js line 445](../app.js#L445) |
-| `VIEWS.study` | [app.js line 457](../app.js#L457) |
-| `VIEWS.trend` | [app.js line 471](../app.js#L471) |
-| `gen` | [app.js line 520](../app.js#L520) |
-| `mcqOpts` | [app.js line 545](../app.js#L545) |
-| `quizStart` | [app.js line 550](../app.js#L550) |
-| `quizDraw` | [app.js line 556](../app.js#L556) |
-| `quizCheck` | [app.js line 577](../app.js#L577) |
-| `quizNext` | [app.js line 586](../app.js#L586) |
-| `finishDrill` | [app.js line 587](../app.js#L587) |
-| `revPanel` | [app.js line 594](../app.js#L594) |
-| `flashDraw` | [app.js line 609](../app.js#L609) |
-| `VIEWS.rev` | [app.js line 613](../app.js#L613) |
-| `flashNew` | [app.js line 621](../app.js#L621) |
-| `dueRevisions` | [app.js line 625](../app.js#L625) |
-| `VIEWS.revlog` | [app.js line 635](../app.js#L635) |
-| `dayRows` | [app.js line 649](../app.js#L649) |
-| `VIEWS.rep` | [app.js line 661](../app.js#L661) |
-| `parseDateStr` | [app.js line 681](../app.js#L681) |
-| `splitLine` | [app.js line 687](../app.js#L687) |
-| `lessonTopics` | [app.js line 692](../app.js#L692) |
-| `splitPlanLessons` | [app.js line 700](../app.js#L700) |
-| `importPlan` | [app.js line 737](../app.js#L737) |
-| `VIEWS.plan` | [app.js line 751](../app.js#L751) |
-| `VIEWS.tricks` | [app.js line 792](../app.js#L792) |
-| `runTrick` | [app.js line 800](../app.js#L800) |
-| `VIEWS.money` | [app.js line 817](../app.js#L817) |
-| `VIEWS.mocks` | [app.js line 829](../app.js#L829) |
-| `VIEWS.notes` | [app.js line 858](../app.js#L858) |
-| `cMonthHTML` | [app.js line 869](../app.js#L869) |
-| `VIEWS.canteen` | [app.js line 881](../app.js#L881) |
-| `setC` | [app.js line 894](../app.js#L894) |
-| `refreshCanteen` | [app.js line 899](../app.js#L899) |
-| `todoSort` | [app.js line 907](../app.js#L907) |
-| `ageText` | [app.js line 908](../app.js#L908) |
-| `gapText` | [app.js line 909](../app.js#L909) |
-| `fmtDT` | [app.js line 921](../app.js#L921) |
-| `remBanner` | [app.js line 922](../app.js#L922) |
-| `todoCompact` | [app.js line 927](../app.js#L927) |
-| `VIEWS.todo` | [app.js line 932](../app.js#L932) |
-| `VIEWS.learn` | [app.js line 953](../app.js#L953) |
-| `VIEWS.diary` | [app.js line 976](../app.js#L976) |
-| `VIEWS.set` | [app.js line 990](../app.js#L990) |
-| `loadDemo` | [app.js line 1002](../app.js#L1002) |
-| `clearDemo` | [app.js line 1036](../app.js#L1036) |
-| `notify` | [app.js line 1044](../app.js#L1044) |
-| `download` | [app.js line 1051](../app.js#L1051) |
-| `applyTheme` | [app.js line 1055](../app.js#L1055) |
-| `sure` | [app.js line 1149](../app.js#L1149) |
-| `todoForm` | [app.js line 1153](../app.js#L1153) |
-| `bookForm` | [app.js line 1166](../app.js#L1166) |
-| `learnForm` | [app.js line 1178](../app.js#L1178) |
-| `diaryForm` | [app.js line 1190](../app.js#L1190) |
-| `checkReminders` | [app.js line 1242](../app.js#L1242) |
-| `startReminders` | [app.js line 1248](../app.js#L1248) |
-| `VIEWS.more` | [app.js line 1257](../app.js#L1257) |
-| `hashPw` | [app.js line 1262](../app.js#L1262) |
-| `loginMode` | [app.js line 1267](../app.js#L1267) |
-| `loginErr` | [app.js line 1279](../app.js#L1279) |
-| `startSession` | [app.js line 1304](../app.js#L1304) |
-| `runWelcome` | [app.js line 1312](../app.js#L1312) |
-| `enterApp` | [app.js line 1325](../app.js#L1325) |
-| `remind` | [app.js line 1328](../app.js#L1328) |
-| `logout` | [app.js line 1332](../app.js#L1332) |
-| `boot` | [app.js line 1337](../app.js#L1337) |
+| `rng` | [app.js line 34](../app.js#L34) |
+| `loadLocal` | [app.js line 105](../app.js#L105) |
+| `setSync` | [app.js line 112](../app.js#L112) |
+| `applyAccount` | [app.js line 114](../app.js#L114) |
+| `persist` | [app.js line 119](../app.js#L119) |
+| `syncFailure` | [app.js line 128](../app.js#L128) |
+| `syncAccount` | [app.js line 140](../app.js#L140) |
+| `onRemote` | [app.js line 166](../app.js#L166) |
+| `syncBanner` | [app.js line 185](../app.js#L185) |
+| `dataChanged` | [app.js line 191](../app.js#L191) |
+| `genPlan` | [app.js line 194](../app.js#L194) |
+| `planTracking` | [app.js line 208](../app.js#L208) |
+| `rollover` | [app.js line 230](../app.js#L230) |
+| `todayTasks` | [app.js line 236](../app.js#L236) |
+| `critItems` | [app.js line 241](../app.js#L241) |
+| `qrMissed` | [app.js line 247](../app.js#L247) |
+| `streak` | [app.js line 261](../app.js#L261) |
+| `bestStreak` | [app.js line 265](../app.js#L265) |
+| `gamify` | [app.js line 270](../app.js#L270) |
+| `setTaskDone` | [app.js line 281](../app.js#L281) |
+| `toast` | [app.js line 297](../app.js#L297) |
+| `confetti` | [app.js line 301](../app.js#L301) |
+| `openForm` | [app.js line 313](../app.js#L313) |
+| `openMenu` | [app.js line 332](../app.js#L332) |
+| `lineSVG` | [app.js line 359](../app.js#L359) |
+| `barsSVG` | [app.js line 376](../app.js#L376) |
+| `donutSVG` | [app.js line 386](../app.js#L386) |
+| `buildNav` | [app.js line 395](../app.js#L395) |
+| `show` | [app.js line 403](../app.js#L403) |
+| `render` | [app.js line 406](../app.js#L406) |
+| `VIEWS.home` | [app.js line 432](../app.js#L432) |
+| `tReset` | [app.js line 493](../app.js#L493) |
+| `tTick` | [app.js line 494](../app.js#L494) |
+| `tPaint` | [app.js line 504](../app.js#L504) |
+| `beep` | [app.js line 509](../app.js#L509) |
+| `saveSession` | [app.js line 512](../app.js#L512) |
+| `VIEWS.study` | [app.js line 524](../app.js#L524) |
+| `VIEWS.trend` | [app.js line 538](../app.js#L538) |
+| `gen` | [app.js line 587](../app.js#L587) |
+| `mcqOpts` | [app.js line 612](../app.js#L612) |
+| `quizStart` | [app.js line 617](../app.js#L617) |
+| `quizDraw` | [app.js line 623](../app.js#L623) |
+| `quizCheck` | [app.js line 644](../app.js#L644) |
+| `quizNext` | [app.js line 653](../app.js#L653) |
+| `finishDrill` | [app.js line 654](../app.js#L654) |
+| `revPanel` | [app.js line 661](../app.js#L661) |
+| `flashDraw` | [app.js line 676](../app.js#L676) |
+| `VIEWS.rev` | [app.js line 680](../app.js#L680) |
+| `flashNew` | [app.js line 688](../app.js#L688) |
+| `dueRevisions` | [app.js line 692](../app.js#L692) |
+| `VIEWS.revlog` | [app.js line 702](../app.js#L702) |
+| `dayRows` | [app.js line 716](../app.js#L716) |
+| `VIEWS.rep` | [app.js line 728](../app.js#L728) |
+| `parseDateStr` | [app.js line 748](../app.js#L748) |
+| `splitLine` | [app.js line 754](../app.js#L754) |
+| `lessonTopics` | [app.js line 759](../app.js#L759) |
+| `splitPlanLessons` | [app.js line 767](../app.js#L767) |
+| `importPlan` | [app.js line 804](../app.js#L804) |
+| `VIEWS.plan` | [app.js line 818](../app.js#L818) |
+| `VIEWS.tricks` | [app.js line 859](../app.js#L859) |
+| `runTrick` | [app.js line 867](../app.js#L867) |
+| `VIEWS.money` | [app.js line 884](../app.js#L884) |
+| `VIEWS.mocks` | [app.js line 896](../app.js#L896) |
+| `VIEWS.notes` | [app.js line 925](../app.js#L925) |
+| `cMonthHTML` | [app.js line 936](../app.js#L936) |
+| `VIEWS.canteen` | [app.js line 948](../app.js#L948) |
+| `setC` | [app.js line 961](../app.js#L961) |
+| `refreshCanteen` | [app.js line 966](../app.js#L966) |
+| `todoSort` | [app.js line 974](../app.js#L974) |
+| `ageText` | [app.js line 975](../app.js#L975) |
+| `gapText` | [app.js line 976](../app.js#L976) |
+| `fmtDT` | [app.js line 988](../app.js#L988) |
+| `remBanner` | [app.js line 989](../app.js#L989) |
+| `todoCompact` | [app.js line 994](../app.js#L994) |
+| `VIEWS.todo` | [app.js line 999](../app.js#L999) |
+| `VIEWS.learn` | [app.js line 1020](../app.js#L1020) |
+| `VIEWS.diary` | [app.js line 1043](../app.js#L1043) |
+| `VIEWS.set` | [app.js line 1057](../app.js#L1057) |
+| `loadDemo` | [app.js line 1069](../app.js#L1069) |
+| `clearDemo` | [app.js line 1103](../app.js#L1103) |
+| `notify` | [app.js line 1111](../app.js#L1111) |
+| `download` | [app.js line 1118](../app.js#L1118) |
+| `applyTheme` | [app.js line 1122](../app.js#L1122) |
+| `sure` | [app.js line 1216](../app.js#L1216) |
+| `todoForm` | [app.js line 1220](../app.js#L1220) |
+| `bookForm` | [app.js line 1233](../app.js#L1233) |
+| `learnForm` | [app.js line 1245](../app.js#L1245) |
+| `diaryForm` | [app.js line 1257](../app.js#L1257) |
+| `checkReminders` | [app.js line 1309](../app.js#L1309) |
+| `startReminders` | [app.js line 1315](../app.js#L1315) |
+| `VIEWS.more` | [app.js line 1324](../app.js#L1324) |
+| `hashPw` | [app.js line 1329](../app.js#L1329) |
+| `loginMode` | [app.js line 1334](../app.js#L1334) |
+| `loginErr` | [app.js line 1346](../app.js#L1346) |
+| `startSession` | [app.js line 1371](../app.js#L1371) |
+| `runWelcome` | [app.js line 1383](../app.js#L1383) |
+| `enterApp` | [app.js line 1396](../app.js#L1396) |
+| `remind` | [app.js line 1399](../app.js#L1399) |
+| `logout` | [app.js line 1403](../app.js#L1403) |
+| `boot` | [app.js line 1431](../app.js#L1431) |
 
 ### Event handler index
 
 
 #### ACT
 
-- `nav` — [implementation](../app.js#L1057).
-- `theme` — [implementation](../app.js#L1058).
-- `logout` — [implementation](../app.js#L1059).
-- `closeModal` — [implementation](../app.js#L1060).
-- `fab` — [implementation](../app.js#L1061).
-- `addTask` — [implementation](../app.js#L1062).
-- `addStudy` — [implementation](../app.js#L1063).
-- `addExp` — [implementation](../app.js#L1064).
-- `addMeet` — [implementation](../app.js#L1065).
-- `addNote` — [implementation](../app.js#L1066).
-- `addRev` — [implementation](../app.js#L1067).
-- `addMock` — [implementation](../app.js#L1068).
-- `partial` — [implementation](../app.js#L1069).
-- `delTask` — [implementation](../app.js#L1070).
-- `doneTask` — [implementation](../app.js#L1071).
-- `resched` — [implementation](../app.js#L1072).
-- `delLog` — [implementation](../app.js#L1073).
-- `delExp` — [implementation](../app.js#L1074).
-- `delMeet` — [implementation](../app.js#L1075).
-- `toggleMeet` — [implementation](../app.js#L1076).
-- `delRev` — [implementation](../app.js#L1077).
-- `delMock` — [implementation](../app.js#L1078).
-- `delNote` — [implementation](../app.js#L1079).
-- `delMist` — [implementation](../app.js#L1080).
-- `tToggle` — [implementation](../app.js#L1081).
-- `tResetBtn` — [implementation](../app.js#L1082).
-- `tSave` — [implementation](../app.js#L1083).
-- `revKind` — [implementation](../app.js#L1084).
-- `revMode` — [implementation](../app.js#L1085).
-- `qzStartRev` — [implementation](../app.js#L1086).
-- `qzCheck` — [implementation](../app.js#L1087).
-- `qzAns` — [implementation](../app.js#L1088).
-- `qzNext` — [implementation](../app.js#L1089).
-- `qzAgain` — [implementation](../app.js#L1090).
-- `flip` — [implementation](../app.js#L1091).
-- `flashNext` — [implementation](../app.js#L1092).
-- `repMode` — [implementation](../app.js#L1093).
-- `repDate` — [implementation](../app.js#L1094).
-- `print` — [implementation](../app.js#L1095).
-- `splitLessons` — [implementation](../app.js#L1096).
-- `loadTimetable` — [implementation](../app.js#L1097).
-- `planPaste` — [implementation](../app.js#L1115).
-- `sampleCsv` — [implementation](../app.js#L1120).
-- `skipToday` — [implementation](../app.js#L1121).
-- `clearPlan` — [implementation](../app.js#L1122).
-- `runTrick` — [implementation](../app.js#L1123).
-- `trickQuiz` — [implementation](../app.js#L1124).
-- `mastered` — [implementation](../app.js#L1125).
-- `exportData` — [implementation](../app.js#L1126).
-- `loadDemo` — [implementation](../app.js#L1127).
-- `clearDemo` — [implementation](../app.js#L1128).
-- `resetAll` — [implementation](../app.js#L1129).
-- `notif` — [implementation](../app.js#L1130).
+- `nav` — [implementation](../app.js#L1124).
+- `theme` — [implementation](../app.js#L1125).
+- `logout` — [implementation](../app.js#L1126).
+- `closeModal` — [implementation](../app.js#L1127).
+- `fab` — [implementation](../app.js#L1128).
+- `addTask` — [implementation](../app.js#L1129).
+- `addStudy` — [implementation](../app.js#L1130).
+- `addExp` — [implementation](../app.js#L1131).
+- `addMeet` — [implementation](../app.js#L1132).
+- `addNote` — [implementation](../app.js#L1133).
+- `addRev` — [implementation](../app.js#L1134).
+- `addMock` — [implementation](../app.js#L1135).
+- `partial` — [implementation](../app.js#L1136).
+- `delTask` — [implementation](../app.js#L1137).
+- `doneTask` — [implementation](../app.js#L1138).
+- `resched` — [implementation](../app.js#L1139).
+- `delLog` — [implementation](../app.js#L1140).
+- `delExp` — [implementation](../app.js#L1141).
+- `delMeet` — [implementation](../app.js#L1142).
+- `toggleMeet` — [implementation](../app.js#L1143).
+- `delRev` — [implementation](../app.js#L1144).
+- `delMock` — [implementation](../app.js#L1145).
+- `delNote` — [implementation](../app.js#L1146).
+- `delMist` — [implementation](../app.js#L1147).
+- `tToggle` — [implementation](../app.js#L1148).
+- `tResetBtn` — [implementation](../app.js#L1149).
+- `tSave` — [implementation](../app.js#L1150).
+- `revKind` — [implementation](../app.js#L1151).
+- `revMode` — [implementation](../app.js#L1152).
+- `qzStartRev` — [implementation](../app.js#L1153).
+- `qzCheck` — [implementation](../app.js#L1154).
+- `qzAns` — [implementation](../app.js#L1155).
+- `qzNext` — [implementation](../app.js#L1156).
+- `qzAgain` — [implementation](../app.js#L1157).
+- `flip` — [implementation](../app.js#L1158).
+- `flashNext` — [implementation](../app.js#L1159).
+- `repMode` — [implementation](../app.js#L1160).
+- `repDate` — [implementation](../app.js#L1161).
+- `print` — [implementation](../app.js#L1162).
+- `splitLessons` — [implementation](../app.js#L1163).
+- `loadTimetable` — [implementation](../app.js#L1164).
+- `planPaste` — [implementation](../app.js#L1182).
+- `sampleCsv` — [implementation](../app.js#L1187).
+- `skipToday` — [implementation](../app.js#L1188).
+- `clearPlan` — [implementation](../app.js#L1189).
+- `runTrick` — [implementation](../app.js#L1190).
+- `trickQuiz` — [implementation](../app.js#L1191).
+- `mastered` — [implementation](../app.js#L1192).
+- `exportData` — [implementation](../app.js#L1193).
+- `loadDemo` — [implementation](../app.js#L1194).
+- `clearDemo` — [implementation](../app.js#L1195).
+- `resetAll` — [implementation](../app.js#L1196).
+- `notif` — [implementation](../app.js#L1197).
 
 #### CHG
 
-- `toggleTask` — [implementation](../app.js#L1133).
-- `tField` — [implementation](../app.js#L1134).
-- `mcq` — [implementation](../app.js#L1135).
-- `revFilter` — [implementation](../app.js#L1136).
-- `formulaQ` — [implementation](../app.js#L1137).
-- `setting` — [implementation](../app.js#L1138).
-- `nameSet` — [implementation](../app.js#L1139).
-- `planFile` — [implementation](../app.js#L1140).
-- `importData` — [implementation](../app.js#L1141).
+- `toggleTask` — [implementation](../app.js#L1200).
+- `tField` — [implementation](../app.js#L1201).
+- `mcq` — [implementation](../app.js#L1202).
+- `revFilter` — [implementation](../app.js#L1203).
+- `formulaQ` — [implementation](../app.js#L1204).
+- `setting` — [implementation](../app.js#L1205).
+- `nameSet` — [implementation](../app.js#L1206).
+- `planFile` — [implementation](../app.js#L1207).
+- `importData` — [implementation](../app.js#L1208).
 
 #### INP
 
-- `canteen` — [implementation](../app.js#L1235).
-- `search` — [implementation](../app.js#L1236).
+- `canteen` — [implementation](../app.js#L1302).
+- `search` — [implementation](../app.js#L1303).
+- `syncRetry` — [sync recovery action](../app.js#L1409).
+- `syncExportDevice` — [sync recovery action](../app.js#L1410).
+- `syncExportServer` — [sync recovery action](../app.js#L1411).
+- `syncUseServer` — [sync recovery action](../app.js#L1412).
+- `syncUseDevice` — [sync recovery action](../app.js#L1423).
 
-### Firebase adapter functions
+### Firebase adapter
 
-- `init` — [cloud.js line 13](../cloud.js#L13).
-- `onUser` — [cloud.js line 31](../cloud.js#L31).
-- `signIn` — [cloud.js line 37](../cloud.js#L37).
-- `signUp` — [cloud.js line 42](../cloud.js#L42).
-- `signOut` — [cloud.js line 47](../cloud.js#L47).
-- `subscribe` — [cloud.js line 49](../cloud.js#L49).
-- `save` — [cloud.js line 57](../cloud.js#L57).
+- `init` — [cloud.js line 14](../cloud.js#L14).
+- `onUser` — [cloud.js line 32](../cloud.js#L32).
+- `persistence` — [cloud.js line 34](../cloud.js#L34).
+- `signIn` — [cloud.js line 38](../cloud.js#L38).
+- `signUp` — [cloud.js line 43](../cloud.js#L43).
+- `signOut` — [cloud.js line 48](../cloud.js#L48).
+- `subscribe` — [cloud.js line 50](../cloud.js#L50).
+- `save` — [cloud.js line 60](../cloud.js#L60).
+- `readServer` — [cloud.js line 82](../cloud.js#L82).
+
+### SSC calculation and merge helpers
+
+- `content` — [ssc-core.js line 9](../ssc-core.js#L9).
+- `mergeStates` — [ssc-core.js line 12](../ssc-core.js#L12).
+- `merge` — [ssc-core.js line 20](../ssc-core.js#L20).
+- `addDays` — [ssc-core.js line 59](../ssc-core.js#L59).
+- `topicStats` — [ssc-core.js line 61](../ssc-core.js#L61).
+- `revisionQueue` — [ssc-core.js line 72](../ssc-core.js#L72).
+- `mockResult` — [ssc-core.js line 87](../ssc-core.js#L87).
+- `validateMockSections` — [ssc-core.js line 93](../ssc-core.js#L93).
+- `validateBank` — [ssc-core.js line 101](../ssc-core.js#L101).
+- `validateAttempt` — [ssc-core.js line 116](../ssc-core.js#L116).
+
+### SSC UI and bank functions
+
+- `installSsc` — [ssc.js line 4](../ssc.js#L4).
+- `form` — [ssc.js line 15](../ssc.js#L15).
+- `bankStore` — [ssc.js line 20](../ssc.js#L20).
+- `loadBank` — [ssc.js line 32](../ssc.js#L32).
+- `available` — [ssc.js line 41](../ssc.js#L41).
+- `statsHTML` — [ssc.js line 45](../ssc.js#L45).
+- `practiceView` — [ssc.js line 49](../ssc.js#L49).
+- `bankView` — [ssc.js line 60](../ssc.js#L60).
+- `mistakeForm` — [ssc.js line 64](../ssc.js#L64).
+- `mistakesView` — [ssc.js line 75](../ssc.js#L75).
+- `revisionsView` — [ssc.js line 79](../ssc.js#L79).
+- `mockForm` — [ssc.js line 83](../ssc.js#L83).
+- `mocksView` — [ssc.js line 92](../ssc.js#L92).
+- `dailyHTML` — [ssc.js line 99](../ssc.js#L99).
+- `startQuestions` — [ssc.js line 107](../ssc.js#L107).
+- `answer` — [ssc.js line 111](../ssc.js#L111).
+- `review` — [ssc.js line 137](../ssc.js#L137).
+
+SSC event actions and screen behaviour are covered in [SSC CGL preparation tools](SSC_CGL_FEATURES.md).
 
 ## Maintenance priorities for future work
 
-Improve server-acknowledged sync status, conflict handling, document size management, schema validation, accessible controls and testing before relying on larger multi-device workloads. A native APK is optional; it is not required for current study tracking and would not automatically fix database design.
+Server confirmation, basic conflict handling and a document-size guard have been added. Future work should cover a permitted and verified PYQ collection, larger multi-document storage, broader schema validation and production sync testing. A native APK is optional; it is not required for current study tracking and would not automatically fix database design.

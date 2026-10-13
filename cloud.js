@@ -1,6 +1,7 @@
 /* Thin wrapper around Firebase (sign-in + one Firestore document per user).
    Firebase is loaded only when firebase-config.js has real values. */
 import { firebaseConfig } from './firebase-config.js';
+import { clone, mergeStates } from './ssc-core.js';
 
 const V = '10.12.2';
 const BASE = 'https://www.gstatic.com/firebasejs/' + V + '/';
@@ -48,12 +49,40 @@ export function signOut() { return m.au.signOut(auth); }
 
 export function subscribe(uid, cb) {
   return m.fs.onSnapshot(
-    m.fs.doc(db, 'users', uid),
-    (snap) => cb(snap.exists() ? snap.data() : null, snap.metadata.hasPendingWrites),
-    () => cb(null, false, true)
+    m.fs.doc(db, 'users', uid), { includeMetadataChanges: true },
+    snap => cb(snap.exists() ? snap.data() : null, snap.metadata.hasPendingWrites, false, snap.metadata.fromCache),
+    () => cb(null, false, true, false)
   );
 }
 
-export function save(uid, obj) {
-  return m.fs.setDoc(m.fs.doc(db, 'users', uid), { data: JSON.stringify(obj), updated: obj._u });
+// Transactions read the current server document and retry if another device writes.
+// Offline changes remain in app localStorage until a server transaction succeeds.
+export async function save(uid, obj, base = null, force = false) {
+  const local = clone(obj), reference = m.fs.doc(db, 'users', uid);
+  return m.fs.runTransaction(db, async transaction => {
+    const snap = await transaction.get(reference);
+    let remote = null;
+    if (snap.exists()) {
+      try { remote = JSON.parse(snap.data().data); if (!remote || typeof remote !== 'object' || Array.isArray(remote) || !Array.isArray(remote.logs)) throw new Error('Invalid account schema'); }
+      catch { const error = new Error('Stored data could not be read. No overwrite was performed.'); error.code = 'sync/corrupt'; throw error; }
+    }
+    const merged = force ? { state: local, conflicts: [] } : mergeStates(base,local,remote);
+    if (merged.conflicts.length) {
+      const error = new Error('Both devices changed the same data.');
+      error.code = 'sync/conflict'; error.remote = remote; error.conflicts = merged.conflicts; throw error;
+    }
+    const saved = merged.state; saved._u = Math.max(Date.now(),saved._u || 0);
+    const data = JSON.stringify(saved);
+    if (new TextEncoder().encode(data).length > 950000) { const error = new Error('Account data is nearing Firestore’s document size limit. Export a backup and reduce old records.'); error.code = 'sync/size'; throw error; }
+    transaction.set(reference, { data, updated: saved._u, serverUpdated: m.fs.serverTimestamp() });
+    return saved;
+  });
+}
+
+export async function readServer(uid) {
+  const snap = await m.fs.getDocFromServer(m.fs.doc(db, 'users', uid));
+  if (!snap.exists()) return null;
+  const state = JSON.parse(snap.data().data);
+  if (!state || typeof state !== 'object' || !Array.isArray(state.logs)) throw new Error('Invalid account data');
+  return state;
 }
