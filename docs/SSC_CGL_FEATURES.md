@@ -95,6 +95,10 @@ The account still uses one Firestore document. A conservative 950,000-byte guard
 
 Real Firebase credentials were not used in these tests. The simulated adapter verifies application behaviour, not an independent audit of the production Firebase service. Check one cross-device test after deployment.
 
+## Tables and visual maths methods
+
+See [Tables 12–30 and visual SSC maths tricks](MATHS_TABLES_AND_TRICKS.md) for selectable tables, worked diagrams, interactive model questions and applicability limits.
+
 ## Files and tests
 
 - `ssc.js`: SSC page rendering, forms, bank storage and question flow.

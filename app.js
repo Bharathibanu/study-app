@@ -3,6 +3,7 @@
    and, if Firebase is set up, synced to your account so phone and PC match. */
 import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
+import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
 import { clone, sameState, mergeStates } from './ssc-core.js';
 
 /* =============== Helpers =============== */
@@ -81,13 +82,13 @@ const NAV = [
   { id: 'learn', label: 'Learning' },
   { id: 'diary', label: 'Diary' },
   { id: 'canteen', label: 'DHANAM Canteen' },
-  { id: 'tricks', label: 'Tricks' },
+  { id: 'tricks', label: 'Maths Tricks' },
   { id: 'money', label: 'Money & Meetings' },
   { id: 'mocks', label: 'Mock Tests' },
   { id: 'notes', label: 'Notes & Formulas' },
   { id: 'set', label: 'Settings' }
 ];
-const TITLES = { home: 'Home', trend: 'Trendline', rev: 'Quick Revision', rep: 'Reports', study: 'Study Timer', revlog: 'Revision Log', plan: 'SSC 200-Day Plan', tricks: 'Multiplication Tricks', todo: 'To-Do', learn: 'Learning', diary: 'Personal Diary', canteen: 'DHANAM Canteen', money: 'Money & Meetings', mocks: 'Mock Tests', notes: 'Notes & Formulas', set: 'Settings', more: 'More' };
+const TITLES = { home: 'Home', trend: 'Trendline', rev: 'Quick Revision', rep: 'Reports', study: 'Study Timer', revlog: 'Revision Log', plan: 'SSC 200-Day Plan', tricks: 'SSC Maths Tricks', todo: 'To-Do', learn: 'Learning', diary: 'Personal Diary', canteen: 'DHANAM Canteen', money: 'Money & Meetings', mocks: 'Mock Tests', notes: 'Notes & Formulas', set: 'Settings', more: 'More' };
 
 Object.assign(ICON, { practice: ICON.rev, mistakes: ICON.notes, revisionQueue: ICON.revlog, mockAnalysis: ICON.mocks, pyq: ICON.plan });
 Object.assign(TITLES, { practice: 'SSC CGL Topic Practice', mistakes: 'Mistake Notebook', revisionQueue: 'Automatic Revision Queue', mockAnalysis: 'CGL Mock Analysis', pyq: '2024–2025 SSC PYQ Bank' });
@@ -579,13 +580,14 @@ VIEWS.trend = function () {
 const KINDS = [
   { k: 'sq', name: 'Squares', range: '1 to 100', big: 'n&sup2;' },
   { k: 'cu', name: 'Cubes', range: '1 to 100', big: 'n&sup3;' },
-  { k: 'tb', name: 'Tables', range: '1 to 50', big: 'a&times;b' },
+  { k: 'tb', name: 'Tables', range: 'Tables 12 to 30', big: 'a&times;b' },
   { k: 'pr', name: 'Prime numbers', range: '1 to 150', big: 'p' }
 ];
-const RV = { kind: null, mode: 'learn', mcq: false }, QZ = {}; let FL = null;
+const RV = { kind: null, mode: 'learn', mcq: false, tableBase: '12', tableLimit: 20 }, QZ = {}; let FL = null;
 const isPrime = (n) => { if (n < 2) return false; for (let i = 2; i * i <= n; i++) if (n % i === 0) return false; return true; };
 function gen(kind, n) {
   const out = [], seen = new Set();
+  if (kind === 'tb') return multiplicationQuestions(RV.tableBase,RV.tableLimit,n);
   if (kind === 'pr') {
     const P = [], C = []; for (let i = 2; i <= 150; i++) (isPrime(i) ? P : C).push(i);
     const pool = []; let g = 0;
@@ -598,7 +600,6 @@ function gen(kind, n) {
     switch (kind) {
       case 'sq': x = ri(2, 100); q = r < .7 ? { t: x + '² = ?', a: x * x } : { t: '√' + x * x + ' = ?', a: x }; break;
       case 'cu': x = ri(2, 100); q = r < .7 ? { t: x + '³ = ?', a: x * x * x } : { t: '∛' + x * x * x + ' = ?', a: x }; break;
-      case 'tb': x = ri(2, 50); y = ri(2, 12); q = { t: x + ' × ' + y + ' = ?', a: x * y }; break;
       case 't1': if (r < .5) { x = ri(12, 99); q = { t: x + ' × 11 = ?', a: x * 11 }; } else if (r < .75) { x = ri(12, 98); q = { t: x + ' × 5 = ?', a: x * 5 }; } else { x = ri(13, 99); q = { t: x + ' × 4 = ?', a: x * 4 }; } break;
       case 't2': if (r < .3) { x = ri(12, 99); q = { t: x + ' × 9 = ?', a: x * 9 }; } else if (r < .55) { x = ri(11, 60); q = { t: x + ' × 99 = ?', a: x * 99 }; } else if (r < .8) { x = ri(6, 40) * 2; q = { t: x + ' × 25 = ?', a: x * 25 }; } else { x = ri(11, 90); q = { t: x + ' × 50 = ?', a: x * 50 }; } break;
       case 't3': if (r < .4) { x = ri(1, 9) * 10 + 5; q = { t: x + '² = ?', a: x * x }; } else if (r < .7) { x = ri(91, 99); y = ri(91, 99); q = { t: x + ' × ' + y + ' = ?', a: x * y }; } else { x = ri(3, 9) * 10; y = ri(1, 4); q = { t: (x + y) + ' × ' + (x - y) + ' = ?', a: x * x - y * y }; } break;
@@ -630,7 +631,7 @@ function quizDraw(box) {
     el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:10px 0 16px"><div class="score">${Z.score}<span style="font-size:26px;color:var(--muted)"> / ${n}</span></div><div class="quiet">Time ${Math.floor(Z.secs / 60)}m ${Z.secs % 60}s · ${Math.round(Z.score / n * 100)}% accuracy</div></div>
     <div class="fb ${good ? 'ok' : 'no'}" style="${good ? '' : 'background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--warn)'}">${good ? 'Excellent work.' : 'Done. Review the answers below and try a new set.'}</div>
     ${Z.wrong.length ? `<h3 style="margin-top:18px;font-size:15px">${Z.noteMist ? 'Added to your mistakes notebook' : 'Missed'}</h3><div class="wrong">${w}</div>` : ''}
-    <div class="actions" style="margin-top:18px"><button class="btn" data-act="qzAgain" data-box="${box}">Try a new set</button></div>`;
+    <div class="actions" style="margin-top:18px"><button class="btn" data-act="qzAgain" data-box="${box}">${Z.modelId ? 'Try this model again' : 'Try a new set'}</button></div>`;
     if (good && !Z.confettied) { Z.confettied = true; confetti(); }
     return;
   }
@@ -644,15 +645,15 @@ function quizDraw(box) {
 function quizCheck(box, v) {
   const Z = QZ[box]; if (!Z || Z.checked) return; const q = Z.qs[Z.i];
   v = String(v).trim().toLowerCase(); if (!v) return;
-  const ok = q.yn ? v === q.a : parseInt(v.replace(/[,\s]/g, ''), 10) === q.a;
-  Z.checked = true; if (ok) Z.score++; else Z.wrong.push(q);
-  document.getElementById(box + '-fb').innerHTML = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? 'Correct.' : 'Not quite. Answer: ' + esc(q.show)}</div><div style="margin-top:12px"><button class="btn" id="${box}-nx" data-act="qzNext" data-box="${box}">${Z.i === Z.qs.length - 1 ? 'See score' : 'Next question'}</button></div>`;
+  const ok = q.yn ? v === q.a : Number(v.replace(/[,\s]/g, '')) === q.a;
+  Z.checked = true; Z.lastAnswer = v; if (ok) Z.score++; else Z.wrong.push(q);
+  document.getElementById(box + '-fb').innerHTML = `<div class="fb ${ok ? 'ok' : 'no'}">${ok ? 'Correct.' : 'Not quite. Answer: ' + esc(q.show)}</div>${q.explanation ? '<p class="quiet">'+esc(q.explanation)+'</p>' : ''}<div style="margin-top:12px"><button class="btn" id="${box}-nx" data-act="qzNext" data-box="${box}">${Z.i === Z.qs.length - 1 ? 'See score' : 'Next question'}</button></div>`;
   $$('#' + box + ' .ans button, #' + box + ' .ans input').forEach((b) => { b.disabled = true; });
   const nx = document.getElementById(box + '-nx'); if (nx) nx.focus();
 }
 function quizNext(box) { const Z = QZ[box]; if (!Z) return; Z.i++; quizDraw(box); }
 function finishDrill(Z) {
-  S.qr.push({ id: uid(), date: today(), kind: Z.kind, score: Z.score, sec: Z.secs });
+  S.qr.push({ id: uid(), date: today(), kind: Z.kind, score: Z.score, sec: Z.secs, ...(Z.kind === 'tb' ? { tableBase: RV.tableBase, tableLimit: RV.tableLimit } : {}) });
   Z.wrong.forEach((q) => { if (!S.mist.some((m) => m.q === q.t)) S.mist.push({ id: uid(), date: today(), kind: Z.kind, q: q.t, a: q.show }); });
   Z.noteMist = true; persist();
   const c = $('#rcheck'); if (c) c.innerHTML = checklistHTML();
@@ -661,14 +662,15 @@ const checklistHTML = () => { const t = today(); return KINDS.map((o) => { const
 function revPanel() {
   if (!RV.kind) return '';
   const o = KINDS.find((x) => x.k === RV.kind);
-  const head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">${o.name}</h3><div class="seg" role="group">${['learn', 'practice', 'flash'].map((m) => `<button data-act="revMode" data-v="${m}" aria-pressed="${RV.mode === m}">${{ learn: 'Learn', practice: 'Practice', flash: 'Flashcards' }[m]}</button>`).join('')}</div></div>`;
+  let head = `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px"><h3 style="margin:0">${o.name}</h3><div class="seg" role="group">${['learn', 'practice', 'flash'].map((m) => `<button data-act="revMode" data-v="${m}" aria-pressed="${RV.mode === m}">${{ learn: 'Learn', practice: 'Practice', flash: 'Flashcards' }[m]}</button>`).join('')}</div></div>`;
+  if (RV.kind === 'tb') head += `<div class="table-controls"><div><label class="label" for="tableBase">Choose multiplication table</label><select class="inp" id="tableBase" data-chg="tableChoice" data-key="tableBase">${Array.from({length:19},(_,i)=>i+12).map(n=>`<option value="${n}" ${String(RV.tableBase)===String(n)?'selected':''}>Table of ${n}</option>`).join('')}<option value="mixed" ${RV.tableBase==='mixed'?'selected':''}>Mixed: all tables 12–30</option></select></div><div><label class="label" for="tableLimit">Multipliers</label><select class="inp" id="tableLimit" data-chg="tableChoice" data-key="tableLimit"><option value="20" ${RV.tableLimit===20?'selected':''}>×1 to ×20</option><option value="50" ${RV.tableLimit===50?'selected':''}>×1 to ×50</option></select></div></div><p class="quiet">Practice and flashcards follow this selection. Changing it resets the current unsaved drill.</p>`;
   if (RV.mode === 'learn') {
     let cells = '';
     if (RV.kind === 'pr') for (let n = 2; n <= 150; n++) { if (isPrime(n)) cells += `<div class="pr">${n}</div>`; }
-    else if (RV.kind === 'tb') for (let a = 1; a <= 50; a++) cells += `<div><span>${a}&times;12</span><b>${a * 12}</b></div>`;
+    else if (RV.kind === 'tb') { const bases = RV.tableBase === 'mixed' ? Array.from({length:19},(_,i)=>i+12) : [Number(RV.tableBase)]; for (const base of bases) for (let a = 1; a <= RV.tableLimit; a++) cells += `<div><span>${base}&times;${a}</span><b>${a * base}</b></div>`; }
     else for (let n = 1; n <= 100; n++) cells += `<div><span>${n}${RV.kind === 'sq' ? '&sup2;' : '&sup3;'}</span><b>${RV.kind === 'sq' ? n * n : n * n * n}</b></div>`;
-    const note = RV.kind === 'tb' ? 'The chart shows the table of 12 for 1 to 50. Practice mixes every number against 2 to 12.' : RV.kind === 'pr' ? '35 primes between 1 and 150.' : 'Scroll the chart, then switch to Practice.';
-    return head + `<p class="quiet" style="margin:8px 0 12px">${note}</p><div class="refgrid">${cells}</div><div style="margin-top:14px"><button class="btn" data-act="revMode" data-v="practice">Start 15 questions</button></div>`;
+    const note = RV.kind === 'tb' ? `Showing ${RV.tableBase === 'mixed' ? 'all tables 12–30' : 'the table of '+RV.tableBase}, multiplied by 1–${RV.tableLimit}.` : RV.kind === 'pr' ? '35 primes between 1 and 150.' : 'Scroll the chart, then switch to Practice.';
+    return head + `<p class="quiet" style="margin:8px 0 12px">${note}</p><div class="refgrid ${RV.kind === 'tb' ? 'table-reference' : ''}">${cells}</div><div style="margin-top:14px"><button class="btn" data-act="revMode" data-v="practice">Start 15 questions</button></div>`;
   }
   if (RV.mode === 'flash') return head + `<div id="qzbox" style="margin-top:12px"></div>`;
   return head + `<div class="actions" style="margin:10px 0"><label class="check"><input type="checkbox" data-chg="mcq"${RV.mcq ? ' checked' : ''}>Multiple choice</label><button class="btn sm" data-act="qzStartRev">${QZ.qz ? 'New set' : 'Start 15 questions'}</button></div><div id="qz"></div>`;
@@ -680,7 +682,7 @@ function flashDraw() {
 VIEWS.rev = function () {
   const mist = S.mist.slice(-12).reverse();
   return `${card("Today's checklist", `<div class="chips" id="rcheck" style="margin:0">${checklistHTML()}</div>${qrMissed() >= 1 ? `<p class="quiet" style="margin-top:10px">Missed days in a row before today: <b>${qrMissed()}</b></p>` : ''}`)}
-  <div class="rgrid" style="margin-top:14px">${KINDS.map((o) => `<button class="rcard" data-act="revKind" data-v="${o.k}" aria-pressed="${RV.kind === o.k}"><span class="big">${o.big}</span><b>${o.name}</b><span class="quiet">${o.range} · 15 questions</span></button>`).join('')}<button class="rcard" data-act="nav" data-v="tricks"><span class="big">&times;</span><b>Multiplication tricks</b><span class="quiet">Beginner to pro · 5 levels</span></button></div>
+  <div class="rgrid" style="margin-top:14px">${KINDS.map((o) => `<button class="rcard" data-act="revKind" data-v="${o.k}" aria-pressed="${RV.kind === o.k}"><span class="big">${o.big}</span><b>${o.name}</b><span class="quiet">${o.range} · 15 questions</span></button>`).join('')}<button class="rcard" data-act="nav" data-v="tricks"><span class="big">&times;</span><b>Maths tricks</b><span class="quiet">Diagrams, model questions and SSC methods</span></button></div>
   <div class="card" id="rpanel" style="margin-top:14px"${RV.kind ? '' : ' hidden'}>${revPanel()}</div>
   ${card('Mistakes notebook', mist.length ? `<div class="list">${mist.map((m) => `<div class="li"><div class="l"><b class="mono">${esc(m.q.replace(' = ?', ''))} = ${esc(m.a.replace(/^(Yes|No), /, ''))}</b><small>${fmtD(m.date)}</small></div><button class="mini del" data-act="delMist" data-id="${m.id}" aria-label="Remove">&times;</button></div>`).join('')}</div>` : '<p class="quiet">Wrong answers are saved here so you can revise them.</p>', ' style="margin-top:14px"')}`;
 };
@@ -849,10 +851,10 @@ const TRICKS = [
   { lv: 4, title: 'Vedic maths', sub: 'Criss-cross, Nikhilam, digit-sum checks', items: [
     ['Criss-cross (two digits)', 'For ab × cd: first column a×c, middle b×c + a×d, last b×d. 23 × 14: 2 | 8+3=11 | 12. Place values: 200 + 110 + 12 = 322.'],
     ['Three digits', 'The same idea with five columns: left-left, then two cross terms, then three cross terms, two cross terms, right-right. Add the columns with carries from the right.'],
-    ['Check with digit sums', 'Add the digits until one digit is left. The digit sum of the product must equal the digit sum of the two digit sums multiplied. 23 × 14 = 322: (5 × 5 = 25 → 7) and 3+2+2 = 7. They match.']] },
+    ['Check with digit sums', 'Add the digits until one digit is left. The digit sum of the product must equal the digit sum of the two digit sums multiplied. 23 × 14 = 322: (5 × 5 = 25 → 7) and 3+2+2 = 7. They match, but matching digit sums cannot prove correctness.']] },
   { lv: 5, title: 'SSC speed', sub: 'Approximation, simplification, percentage', items: [
     ['Near-round numbers', '49 × 51 = 50² − 1 = 2499. 998 × 1002 = 1000² − 4 = 999996.'],
-    ['Percentages as fractions', '12.5% = 1/8, 16.67% = 1/6, 33.33% = 1/3, 37.5% = 3/8, 62.5% = 5/8, 6.25% = 1/16. 37.5% of 640 = 3 × 80 = 240.'],
+    ['Percentages as fractions', '12.5% = 1/8, 16⅔% = 1/6, 33⅓% = 1/3 (16.67% and 33.33% are rounded approximations), 37.5% = 3/8, 62.5% = 5/8, 6.25% = 1/16. 37.5% of 640 = 3 × 80 = 240.'],
     ['Simplification order', 'Brackets, orders, division and multiplication left to right, then addition and subtraction. Spot identities before multiplying large numbers.']] }
 ];
 const dr = (n) => (n % 9 === 0 ? 9 : n % 9);
@@ -860,14 +862,14 @@ VIEWS.tricks = function () {
   const m = TRICKS.filter((x) => S.mastered[x.lv]).length;
   return `<div class="grid g2"><div class="card"><h3>Numbers near 100</h3><p class="quiet" style="margin-bottom:12px">Pick two numbers between 80 and 99 and watch the method run.</p>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><input id="n1" class="num" type="text" inputmode="numeric" value="97" aria-label="First number"><span class="mono" style="font-size:22px">&times;</span><input id="n2" class="num" type="text" inputmode="numeric" value="94" aria-label="Second number"><button class="btn" data-act="runTrick">Show steps</button></div><div class="steps" id="steps"></div></div>
-  <div class="card"><h3>Your progress</h3><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Levels mastered</span><span class="mono">${m} / 5</span></div><div class="bar"><i style="width:${m * 20}%"></i></div><p class="quiet" style="margin-top:12px">Open a level, read the tricks, try the 5 practice questions, then tick Mastered.</p></div></div>
-  <div style="margin-top:14px">${TRICKS.map((x) => `<details class="lv"><summary><span class="lvnum">${x.lv}</span><span style="flex:1"><b>${x.title}</b><br><span class="quiet" style="font-weight:400">${x.sub}</span></span>${S.mastered[x.lv] ? '<span class="badge green">Mastered</span>' : ''}</summary><div class="body">${x.items.map((i) => `<div class="t"><b>${i[0]}</b>${i[1]}</div>`).join('')}<div id="tq${x.lv}"></div><div class="actions"><button class="btn sm" data-act="trickQuiz" data-v="${x.lv}">Try 5 questions</button><button class="btn sm ghost" data-act="mastered" data-v="${x.lv}">${S.mastered[x.lv] ? 'Unmark mastered' : 'Mark as mastered'}</button></div></div></details>`).join('')}</div>`;
+  <div class="card"><h3>Your progress</h3><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Multiplication levels mastered</span><span class="mono">${m} / 5</span></div><div class="bar"><i style="width:${m * 20}%"></i></div><p class="quiet" style="margin-top:12px">Open a level, read the tricks, try the 5 practice questions, then tick Mastered.</p></div></div>
+  <div style="margin-top:14px">${TRICKS.map((x) => `<details class="lv"><summary><span class="lvnum">${x.lv}</span><span style="flex:1"><b>${x.title}</b><br><span class="quiet" style="font-weight:400">${x.sub}</span></span>${S.mastered[x.lv] ? '<span class="badge green">Mastered</span>' : ''}</summary><div class="body">${x.items.map((i) => `<div class="t"><b>${i[0]}</b>${i[1]}${trickVisual(i[0])}</div>`).join('')}<div id="tq${x.lv}"></div><div class="actions"><button class="btn sm" data-act="trickQuiz" data-v="${x.lv}">Try 5 questions</button><button class="btn sm ghost" data-act="mastered" data-v="${x.lv}">${S.mastered[x.lv] ? 'Unmark mastered' : 'Mark as mastered'}</button></div></div></details>`).join('')}</div>${sscMathHTML(S.mastered)}`;
 };
 AFTER.tricks = runTrick;
 function runTrick() {
   const a1 = $('#n1'), box = $('#steps'); if (!a1 || !box) return;
-  const x = parseInt(a1.value, 10), y = parseInt($('#n2').value, 10);
-  if (!(x >= 80 && x <= 99 && y >= 80 && y <= 99)) { box.innerHTML = '<div class="step" style="--k:0;background:var(--bad-bg);color:var(--bad)"><div>Enter two whole numbers between 80 and 99.</div></div>'; return; }
+  const x = Number(a1.value), y = Number($('#n2').value);
+  if (!(Number.isInteger(x) && Number.isInteger(y) && x >= 80 && x <= 99 && y >= 80 && y <= 99)) { box.innerHTML = '<div class="step" style="--k:0;background:var(--bad-bg);color:var(--bad)"><div>Enter two whole numbers between 80 and 99.</div></div>'; return; }
   const a = 100 - x, b = 100 - y; let left = x - b, prod = a * b, right = prod, note = '';
   if (prod >= 100) { left += Math.floor(prod / 100); right = prod % 100; note = ' The product has 3 digits, so carry ' + Math.floor(prod / 100) + ' to the left part.'; }
   const res = left * 100 + right, S5 = [
@@ -875,7 +877,7 @@ function runTrick() {
     `Cross-subtract: <b>${x} &minus; ${b} = ${x - b}</b> (same as ${y} &minus; ${a} = ${y - a}). This is the left part.`,
     `Multiply the gaps: <b>${a} &times; ${b} = ${prod}</b>. This is the right part, kept to two digits.${note}`,
     `Join them: <b>${left}</b> | <b>${pad(right)}</b>`,
-    `Check with digit sums: ${dr(x)} &times; ${dr(y)} gives digit sum ${dr(dr(x) * dr(y))}, and ${res} has digit sum ${dr(res)}. ${dr(dr(x) * dr(y)) === dr(res) ? 'They match.' : 'They differ, recheck.'}`
+    `Check with digit sums: ${dr(x)} &times; ${dr(y)} gives digit sum ${dr(dr(x) * dr(y))}, and ${res} has digit sum ${dr(res)}. ${dr(dr(x) * dr(y)) === dr(res) ? 'They match. This is a useful check, not proof.' : 'They differ, recheck.'}`
   ];
   box.innerHTML = S5.map((s, i) => `<div class="step" style="--k:${i}"><i>${i + 1}</i><div>${s}</div></div>`).join('') + `<div class="step" style="--k:${S5.length};background:transparent;padding:4px 0"><div><span class="quiet">Answer</span><div class="answer">${x} &times; ${y} = ${res}</div></div></div>`;
 }
@@ -1154,7 +1156,7 @@ const ACT = {
   qzCheck: (d) => { const i = document.getElementById(d.box + '-in'); quizCheck(d.box, i ? i.value : ''); },
   qzAns: (d) => quizCheck(d.box, d.v),
   qzNext: (d) => quizNext(d.box),
-  qzAgain: (d) => { if (d.box === 'qz') ACT.qzStartRev(); else { const Z = QZ[d.box]; quizStart(d.box, Z.kind, 5, {}); } },
+  qzAgain: (d) => { if (d.box === 'qz') ACT.qzStartRev(); else { const Z = QZ[d.box]; if (Z.modelId) ACT.mathModelPractice({ id: Z.modelId }); else quizStart(d.box, Z.kind, 5, {}); } },
   flip: () => { FL.show = !FL.show; flashDraw(); },
   flashNext: () => { if (FL.i >= FL.qs.length - 1) flashNew(); else { FL.i++; FL.show = false; } flashDraw(); },
   repMode: (d) => { REP.mode = d.v; render(); },
@@ -1196,7 +1198,18 @@ const ACT = {
   resetAll: (d, b) => { if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to erase everything'; b.style.color = 'var(--bad)'; setTimeout(() => { b.dataset.sure = ''; b.textContent = 'Erase everything'; b.style.color = ''; }, 4000); return; } const nm = S.name; S = blank(); S.name = nm; persist(); toast('All data erased'); show('home'); },
   notif: () => { if (!('Notification' in window)) { toast('This browser does not support reminders'); return; } Notification.requestPermission().then((p) => { toast(p === 'granted' ? 'Reminders are on' : 'Reminders were not allowed'); if (p === 'granted') notify('Reminders are on. You will see overdue and skipped-revision alerts when you open the app.'); }); }
 };
+ACT.mathModelPractice = d => {
+  const question = modelExercise(d.id); if (!question) return;
+  const target = document.getElementById('mathq-' + d.id); if (!target) return;
+  const box = 'mathquiz-' + d.id; target.innerHTML = `<div id="${box}"></div>`;
+  quizStart(box,'math-model',1,{qs:[question],modelId:d.id,onDone:Z=>{
+    ssc.ensure(); S.practice.push({id:uid(),date:today(),at:Date.now(),subj:'Quant',topic:question.topic,kind:'original',attempted:1,correct:Z.score,skipped:0,seconds:Math.max(1,Z.secs),source:'SSC maths model question'});
+    if (!Z.score) S.mistakeBook.push({id:uid(),date:today(),at:Date.now(),subj:'Quant',topic:question.topic,question:question.t,yourAnswer:Z.lastAnswer || '',correctAnswer:question.show,method:question.explanation,cause:'Unclassified',source:'Original maths model — not a PYQ',archived:false});
+    persist();
+  }});
+};
 const CHG = {
+  tableChoice: el => { clearInterval(QZ.qz?.iv); delete QZ.qz; FL = null; RV[el.dataset.key] = el.dataset.key === 'tableLimit' ? Number(el.value) : el.value; lsSet('sst_tableBase',RV.tableBase); lsSet('sst_tableLimit',String(RV.tableLimit)); render(); if (RV.mode === 'practice') ACT.qzStartRev(); },
   toggleTask: (el) => { const complete = el.checked; setTaskDone(el.dataset.id, complete); render(); if (complete) toast('Lesson achieved — one step closer'); },
   tField: (el) => { T[el.dataset.f] = el.value; },
   mcq: (el) => { RV.mcq = el.checked; if (QZ.qz) QZ.qz.mcq = el.checked; },
@@ -1429,6 +1442,9 @@ window.addEventListener('offline', () => { if (UID) setSync(syncState.dirty ? 'S
 const ssc = installSsc({ state: () => S, persist, render, show, card, esc, today, uid, openForm, toast, ACT, CHG, VIEWS, download, current: () => CUR });
 
 async function boot() {
+  const savedTable = lsGet('sst_tableBase'), savedLimit = Number(lsGet('sst_tableLimit'));
+  if (savedTable === 'mixed' || Number(savedTable) >= 12 && Number(savedTable) <= 30 && Number.isInteger(Number(savedTable))) RV.tableBase = savedTable;
+  if ([20,50].includes(savedLimit)) RV.tableLimit = savedLimit;
   applyTheme(); $('#eye').innerHTML = ICON.eye;
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./sw.js').catch(() => {});
   loginMode();

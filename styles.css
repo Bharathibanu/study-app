@@ -365,3 +365,16 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 @media(max-width:480px){.ssc-filters{grid-template-columns:1fr}.ssc-daily .btn{margin-left:0}.li{flex-wrap:wrap}}
 
 @media(max-width:480px){.trow{flex-wrap:wrap;padding-bottom:8px}.trow .task{flex-basis:100%}.trow .mini{min-height:36px}.ssc-options .ssc-answer{overflow-wrap:anywhere}}
+
+/* Multiplication-table controls and accessible maths diagrams. */
+.table-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.table-reference{max-height:480px;overflow:auto;padding:4px}
+.math-teaching{margin:14px 0 4px}
+.math-diagram{display:block;width:100%;max-width:520px;height:auto;margin:12px auto}
+.math-model{border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;background:var(--surface)}
+.math-model summary{font-weight:600;cursor:pointer}
+.math-model p{margin-top:10px;white-space:normal}
+.math-extra{margin-top:14px}
+.math-extra summary{flex-wrap:wrap;gap:10px}
+.lv .t .quiet{font-size:13px}
+@media(max-width:480px){.table-controls{grid-template-columns:1fr}.refgrid.table-reference{grid-template-columns:repeat(2,minmax(0,1fr))}}
