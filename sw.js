@@ -1,10 +1,10 @@
 /* Service worker: makes the app open instantly and work offline.
    IMPORTANT: whenever you change any app file, increase the number in CACHE
    (for example study-tracker-v2) so phones and PCs pick up the new files. */
-const CACHE = 'study-tracker-v3';
+const CACHE = 'study-tracker-v4';
 const FILES = [
   './', './index.html', './styles.css', './app.js', './cloud.js',
-  './firebase-config.js', './manifest.json',
+  './firebase-config.js', './manifest.json', './my-timetable.csv',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'
 ];
 

@@ -687,7 +687,7 @@ VIEWS.plan = function () {
   <div class="setrow"><label class="label" for="ptext">Or paste here</label><textarea class="inp" id="ptext" placeholder="1,2026-10-13,Quant,Percentage,2,Basics&#10;1,2026-10-13,Reasoning,Syllogism,1,"></textarea></div>
   <div class="setrow"><label class="label" for="pday1">Day 1 date (used when the file has no dates)</label><input class="inp" type="date" id="pday1" value="${esc(S.settings.day1 || t)}"></div>
   <label class="check" style="margin-bottom:12px"><input type="checkbox" id="pskip" checked>Skip days before today (do not create overdue tasks)</label>
-  <div class="actions"><button class="btn" data-act="planPaste">Import</button><button class="btn ghost" data-act="sampleCsv">Download sample CSV</button></div><div class="err" id="perr" style="color:var(--good)"></div>`)}
+  <p class="quiet">Your PDF timetable covers Days 1–190. Study time starts at 1 hour per topic; adjust the CSV hours before importing if needed. Days 191–200 were not included in the PDF.</p><div class="actions"><button class="btn" data-act="loadTimetable">Load my timetable</button><a class="btn ghost" href="my-timetable.csv" download>Download my timetable CSV</a></div><div class="actions"><button class="btn" data-act="planPaste">Import</button><button class="btn ghost" data-act="sampleCsv">Download sample CSV</button></div><div class="err" id="perr" style="color:var(--good)"></div>`)}
   </div>
   ${has ? card('Coming up', `<div class="tablewrap"><table><thead><tr><th>Day</th><th>Date</th><th>Subject</th><th>Topic</th><th>Hours</th></tr></thead><tbody>${next.map((r) => `<tr><td class="n">${r.day}</td><td class="n">${fmtD(r.date)}</td><td>${esc(r.subj)}</td><td>${esc(r.topic)}</td><td class="n">${(r.min / 60).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`, ' style="margin-top:14px"') : ''}`;
 };
@@ -1021,6 +1021,24 @@ const ACT = {
   repMode: (d) => { REP.mode = d.v; render(); },
   repDate: (d) => { REP.mode = 'day'; REP.date = d.v; render(); },
   print: () => window.print(),
+  loadTimetable: async (d, button) => {
+    if (S.plan.length && !sure(button, 'Replace existing plan?')) return;
+    const day1 = $('#pday1').value || today(), skip = $('#pskip').checked;
+    button.disabled = true;
+    try {
+      const response = await fetch('./my-timetable.csv');
+      if (!response.ok) throw new Error('Timetable unavailable');
+      const text = await response.text();
+      S.settings.day1 = day1;
+      const count = importPlan(text, skip);
+      if (!count) throw new Error('Empty timetable');
+      toast(count + ' timetable topics loaded'); render();
+    } catch (e) {
+      button.disabled = false;
+      const error = $('#perr');
+      if (error) { error.style.color = 'var(--bad)'; error.textContent = 'Could not load the timetable. Please retry when online.'; }
+    }
+  },
   planPaste: () => {
     const f = $('#pfile'), txt = $('#ptext').value; S.settings.day1 = $('#pday1').value || today();
     const go = (text) => { const n = importPlan(text, $('#pskip').checked); if (!n) { $('#perr').style.color = 'var(--bad)'; $('#perr').textContent = 'Could not read any rows. Each line needs at least Day, Date, Subject.'; return; } toast(n + ' plan lines imported'); render(); };
