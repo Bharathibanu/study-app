@@ -138,6 +138,28 @@ function genPlan() {
   if (n) persist();
   return n;
 }
+function planTracking() {
+  if (!S.plan.length) return card('Plan tracking', '<p class="quiet">Load your SSC plan to track achievement, gaps and warnings.</p>');
+  const t = today(), byKey = new Map(S.tasks.filter(k => k.pk).map(k => [k.pk, k]));
+  const rows = S.plan.filter(r => !S.planFrom || r.date >= S.planFrom).map(r => {
+    const task = byKey.get(r.date + '|' + r.subj + '|' + r.topic);
+    const achieved = Math.min(r.min, Math.max(0, task ? task.spent : 0));
+    return { ...r, task, achieved, gap: Math.max(0, r.min - achieved) };
+  });
+  const due = rows.filter(r => r.date <= t), overdue = due.filter(r => r.date < t && r.gap > 0);
+  const planned = sum(due, r => r.min), achieved = sum(due, r => r.achieved), gap = planned - achieved;
+  const subjects = [...new Set(due.map(r => r.subj))];
+  const pending = due.filter(r => r.gap > 0).sort((a,b) => a.date.localeCompare(b.date));
+  return card('Achievement against my plan', `<div class="stats">
+    <div class="stat"><span class="label">Planned to date</span><b>${hrs(planned)} h</b></div>
+    <div class="stat"><span class="label">Achieved</span><b>${hrs(achieved)} h</b><small>${planned ? Math.round(achieved / planned * 100) : 0}% of due work</small></div>
+    <div class="stat"><span class="label">Remaining gap</span><b>${hrs(gap)} h</b></div>
+    <div class="stat"><span class="label">Overdue topics</span><b>${overdue.length}</b><small>${overdue.filter(r => diff(r.date,t)>3).length} critical (over 3 days)</small></div>
+  </div><p class="quiet">Achievement counts minutes recorded against plan tasks, including manual completion. Extra study, revision drills and mock scores remain separate. Future work and skipped dates are excluded from the gap.</p>
+  ${overdue.length ? `<p class="err" role="status">Warning: ${overdue.length} overdue topics; ${hrs(sum(overdue,r=>r.gap))} hours to catch up.</p>` : `<p class="quiet">${gap ? 'Today’s plan is still in progress.' : due.length ? 'All work due so far is achieved.' : 'Your plan has not started yet.'}</p>`}
+  <div class="tablewrap"><table><thead><tr><th>Subject</th><th>Planned</th><th>Achieved</th><th>Gap</th></tr></thead><tbody>${subjects.map(subj=>{const group=due.filter(r=>r.subj===subj);return `<tr><td>${esc(subj)}</td><td>${hrs(sum(group,r=>r.min))} h</td><td>${hrs(sum(group,r=>r.achieved))} h</td><td>${hrs(sum(group,r=>r.gap))} h</td></tr>`;}).join('')}</tbody></table></div>
+  <h4>Next work to finish</h4>${pending.slice(0,10).map(r=>`<div class="li"><div class="l"><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Day ${r.day} · ${fmtD(r.date)} · ${r.gap} min left · ${r.date<t ? diff(r.date,t)>3 ? 'Critical' : 'Overdue' : 'Due today'}</small></div>${r.task ? `<button class="btn sm ghost" data-act="partial" data-id="${r.task.id}">Log progress</button>` : ''}</div>`).join('')}${pending.length>10?`<p class="quiet">${pending.length-10} more pending topics appear in Home’s schedule.</p>`:''}`, ' style="margin-bottom:14px"');
+}
 function rollover() {
   const t = today(); let ch = false;
   S.tasks.forEach((k) => { if (!k.done && k.date < t) { k.date = t; ch = true; } });
@@ -321,7 +343,7 @@ function render() {
   });
   $('#vtitle').textContent = TITLES[CUR] || '';
   const fn = VIEWS[CUR] || VIEWS.home;
-  $('#view').innerHTML = `<div class="view">${fn()}</div>`;
+  $('#view').innerHTML = `<div class="view">${['home','study','trend','rep','plan','rev','revlog','mocks','learn'].includes(CUR) ? planTracking() : ''}${fn()}</div>`;
   const after = AFTER[CUR]; if (after) after();
 }
 const AFTER = {};
@@ -421,11 +443,15 @@ function beep() {
 }
 function saveSession(min, pre) {
   openForm('Save study session', [
+    { k: 'task', label: 'Count toward plan topic (optional)', type: 'select', options: [['', 'Extra study (not linked)'], ...S.tasks.filter(k => k.pk && !k.done).map(k => [k.id, k.subj + ': ' + k.topic])] },
     { k: 'subj', label: 'Subject', type: 'select', options: SUBJECTS, value: (pre && pre.subj) || T.subj },
     { k: 'topic', label: 'Topic', value: (pre && pre.topic) || T.topic, ph: 'e.g. Percentage', req: 1 },
     { k: 'min', label: 'Minutes', type: 'number', value: min, min: 1, req: 1 },
     { k: 'focus', label: 'How focused were you?', type: 'select', options: [[5, '5 · Fully focused'], [4, '4 · Good'], [3, '3 · Average'], [2, '2 · Distracted'], [1, '1 · Barely studied']], value: 4 }
-  ], 'Save session', (v) => { S.logs.push({ id: uid(), date: today(), at: Date.now(), subj: v.subj, topic: v.topic, min: v.min, focus: +v.focus }); persist(); toast('Session saved'); if (CUR === 'study' || CUR === 'home') render(); });
+  ], 'Save session', (v) => { const task = S.tasks.find(k => k.id === v.task && k.pk && !k.done);
+    const credit = task ? Math.min(v.min, Math.max(0, task.plan - task.spent)) : 0;
+    S.logs.push({ id: uid(), date: today(), at: Date.now(), subj: task ? task.subj : v.subj, topic: task ? task.topic : v.topic, min: v.min, focus: +v.focus, task: task ? task.id : null, credit });
+    if (task) { task.spent += credit; if (task.spent >= task.plan) { task.done = true; task.doneDate = today(); } } persist(); toast('Session saved'); if (CUR === 'study' || CUR === 'home') render(); });
 }
 VIEWS.study = function () {
   if (!T.total) tReset('focus');
@@ -998,7 +1024,7 @@ const ACT = {
   delTask: (d) => { S.tasks = S.tasks.filter((k) => k.id !== d.id); S.logs = S.logs.filter((l) => l.task !== d.id); persist(); render(); },
   doneTask: (d) => { setTaskDone(d.id, true); toast('Marked done'); render(); },
   resched: (d) => { const k = S.tasks.find((x) => x.id === d.id); if (k) { k.date = addD(today(), 1); persist(); toast('Moved to tomorrow'); render(); } },
-  delLog: (d) => { S.logs = S.logs.filter((l) => l.id !== d.id); persist(); render(); },
+  delLog: (d) => { const log = S.logs.find(l => l.id === d.id); const task = log && S.tasks.find(k => k.id === log.task); if (task) { task.spent = Math.max(0, task.spent - (log.credit == null ? log.min : log.credit)); if (task.spent < task.plan) { task.done = false; task.doneDate = null; } } S.logs = S.logs.filter((l) => l.id !== d.id); persist(); render(); },
   delExp: (d) => { S.exp = S.exp.filter((x) => x.id !== d.id); persist(); render(); },
   delMeet: (d) => { S.meet = S.meet.filter((x) => x.id !== d.id); persist(); render(); },
   toggleMeet: (d) => { const m = S.meet.find((x) => x.id === d.id); if (m) { m.done = !m.done; persist(); render(); } },
