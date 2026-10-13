@@ -326,7 +326,7 @@ function donutSVG(parts) {
 /* =============== Navigation =============== */
 function buildNav() {
   const prim = NAV.filter((n) => n.prim);
-  $('#side').innerHTML = `<div class="brandmark"><div class="logo">B</div><div class="bname">Study Tracker<small>SSC plan</small></div></div>` +
+  $('#side').innerHTML = `<div class="brandmark"><img class="logo" src="icons/logo-192.png" alt="Study Tracker logo"><div class="bname">Study Tracker<small>SSC plan</small></div></div>` +
     NAV.map((n) => `<button class="nav${n.prim ? '' : ' sec'}" data-act="nav" data-v="${n.id}">${ICON[n.id]}<span>${esc(n.short || n.label)}</span></button>`).join('') +
     `<button class="nav moreb" data-act="nav" data-v="more">${ICON.more}<span>More</span></button>`;
   $('#themeBtn').innerHTML = ICON.theme; $('#outBtn').innerHTML = ICON.out; $('#eye').innerHTML = ICON.eye;

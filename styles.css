@@ -323,3 +323,5 @@ textarea.inp{min-height:110px;resize:vertical;font-family:var(--f-mono);font-siz
 .pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .chip[aria-pressed]{cursor:pointer}
 .dcard .pre{font-size:15px;line-height:1.6}
+
+img.logo{object-fit:cover;display:block;background:#281400}
