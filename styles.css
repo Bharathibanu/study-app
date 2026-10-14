@@ -385,3 +385,5 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 .course-day input{accent-color:var(--teal);width:20px;height:20px;flex-shrink:0}
 #method-result p{margin-top:10px}#method-x,#method-y{width:140px;max-width:100%}
 #masterclass-test{margin-top:14px}
+
+.page-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}.page-heading h2{overflow-wrap:anywhere}#backHome{flex-shrink:0}

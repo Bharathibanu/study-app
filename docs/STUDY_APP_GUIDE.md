@@ -116,7 +116,7 @@ Creating a Firebase account does not automatically migrate the previous local-on
 
 ### Home
 
-Shows the greeting, date, streak, daily task percentage, study minutes, expenses, critical items, today’s schedule, meetings, compact to-dos, level and badges. The shared plan-tracking panel shows achievement against imported plan rows.
+Shows the greeting, date, streak, daily task percentage, study minutes, expenses, critical items, today’s schedule, meetings, compact to-dos, level and badges. The Home-only plan-tracking panel shows achievement against imported plan rows. It is not repeated on other sections.
 
 Task checkbox: records the remaining planned minutes as manually completed. **Part** / **Log progress**: records a chosen number of minutes. Delete removes the task and linked study logs. Reschedule moves an unfinished task’s working date; its original due date still matters for overdue accounting.
 
@@ -128,7 +128,7 @@ Choose a plan topic in the session form to credit its achievement. Extra study r
 
 ### Trendline
 
-Uses study logs to show a recent-hours chart, averages, week-to-week direction, focused-day comparisons and a heatmap. Comparisons use the general daily target. The shared plan panel separately reports imported-plan achievement. A trend of total study hours is not the same as finishing assigned plan topics.
+Uses study logs to show a recent-hours chart, averages, week-to-week direction, focused-day comparisons and a heatmap. Comparisons use the general daily target. Home separately reports imported-plan achievement. A trend of total study hours is not the same as finishing assigned plan topics.
 
 ### Quick Revision
 
@@ -140,7 +140,7 @@ Records topic, subject, date, minutes, question count and correct answers. Due r
 
 ### Reports
 
-Day reports show timetable rows, planned time, achieved task minutes, statuses and carry-forward work. Week/month reports summarize study logs, tasks and expenditure. Printing uses browser print styles and can save a PDF. The shared plan panel is cumulative to today, even when a historical report date is selected; read its “to date” labels separately from the selected-period report.
+Day reports show timetable rows, planned time, achieved task minutes, statuses and carry-forward work. Week/month reports summarize study logs, tasks and expenditure. Printing uses browser print styles and can save a PDF. Cumulative achievement against the imported plan is shown only on Home; Reports retains its own selected-period calculations.
 
 ### SSC Plan
 
@@ -174,9 +174,9 @@ Expenses have amount, category, payment mode, date and note. Meetings have title
 
 Records test name, date, score, maximum marks, time and notes. Displays performance history and calculations from entered results. Mock scores remain distinct from plan completion.
 
-### Notes & Formulas
+### Notes & Vocabulary
 
-Provides built-in study reference material, search and personal notes/tags. Built-in arrays live in source code; personal notes live in account state. Notes are not executable code.
+Stores personal notes/tags and shows the built-in vocabulary list. The built-in Formula Vault and its search have been removed. Personal notes remain in account state; formula explanations within Maths Tricks are separate teaching material.
 
 ### Multiplication Tricks
 
@@ -187,6 +187,10 @@ Contains explanations/examples, practice quizzes and a mastered toggle for each 
 Daily target, exam date, focus/break minutes, motivation, budget, name, theme and notifications. Field-change handlers save values; theme preference is device-local. Data controls export/import backups, add/remove demo records and erase the active account state.
 
 **Erase everything** requires a second click but still overwrites active data. Demo data is marked so it can be removed separately. Importing a backup replaces state rather than merging every item.
+
+### Back navigation
+
+The header’s Home button and the browser/Android Back action return to Home from any section. Moving between sections replaces the current internal history entry, so Back does not require stepping through every section. Refresh keeps the current section. From Home, Back is allowed to leave normally. Back from a section also closes any open modal.
 
 ### More and Quick add
 

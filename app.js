@@ -86,10 +86,10 @@ const NAV = [
   { id: 'tricks', label: 'Maths Tricks' },
   { id: 'money', label: 'Money & Meetings' },
   { id: 'mocks', label: 'Mock Tests' },
-  { id: 'notes', label: 'Notes & Formulas' },
+  { id: 'notes', label: 'Notes & Vocabulary' },
   { id: 'set', label: 'Settings' }
 ];
-const TITLES = { home: 'Home', trend: 'Trendline', rev: 'Quick Revision', rep: 'Reports', study: 'Study Timer', revlog: 'Revision Log', plan: 'SSC 200-Day Plan', tricks: 'SSC Maths Tricks', todo: 'To-Do', learn: 'Learning', diary: 'Personal Diary', canteen: 'DHANAM Canteen', money: 'Money & Meetings', mocks: 'Mock Tests', notes: 'Notes & Formulas', set: 'Settings', more: 'More' };
+const TITLES = { home: 'Home', trend: 'Trendline', rev: 'Quick Revision', rep: 'Reports', study: 'Study Timer', revlog: 'Revision Log', plan: 'SSC 200-Day Plan', tricks: 'SSC Maths Tricks', todo: 'To-Do', learn: 'Learning', diary: 'Personal Diary', canteen: 'DHANAM Canteen', money: 'Money & Meetings', mocks: 'Mock Tests', notes: 'Notes & Vocabulary', set: 'Settings', more: 'More' };
 
 Object.assign(ICON, { practice: ICON.rev, mistakes: ICON.notes, revisionQueue: ICON.revlog, mockAnalysis: ICON.mocks, pyq: ICON.plan });
 Object.assign(TITLES, { practice: 'SSC CGL Topic Practice', mistakes: 'Mistake Notebook', revisionQueue: 'Automatic Revision Queue', mockAnalysis: 'CGL Mock Analysis', pyq: '2024–2025 SSC PYQ Bank' });
@@ -402,9 +402,26 @@ function buildNav() {
   $('#themeBtn').innerHTML = ICON.theme; $('#outBtn').innerHTML = ICON.out; $('#eye').innerHTML = ICON.eye;
   return prim;
 }
-function show(v) {
-  CUR = v; window.scrollTo(0, 0); render();
+function routeState(view) {
+  return { ...(history.state || {}), studyTracker: { view, section: view !== 'home' } };
 }
+function show(v, fromHistory = false) {
+  if (!VIEWS[v]) v = 'home';
+  if (!fromHistory && !$('#app').hidden) {
+    if (v === 'home' && history.state?.studyTracker?.section) { history.back(); return; }
+    if (v !== 'home') {
+      if (history.state?.studyTracker?.section) history.replaceState(routeState(v),'');
+      else { history.replaceState(routeState('home'),''); history.pushState(routeState(v),''); }
+    } else history.replaceState(routeState('home'),'');
+  }
+  closeModal(); CUR = v; window.scrollTo(0, 0); render();
+}
+window.addEventListener('popstate', event => {
+  if ($('#app').hidden || !S) return;
+  // All section navigation shares one Home anchor. Back from any section reaches it.
+  const view = event.state?.studyTracker?.view || 'home';
+  show(view, true);
+});
 function render() {
   const secIds = NAV.filter((n) => !n.prim).map((n) => n.id);
   $$('.nav').forEach((b) => {
@@ -412,8 +429,9 @@ function render() {
     if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
   $('#vtitle').textContent = TITLES[CUR] || '';
+  $('#backHome').hidden = CUR === 'home';
   const fn = VIEWS[CUR] || VIEWS.home;
-  $('#view').innerHTML = `<div class="view">${syncBanner()}${['home','study','trend','rep','plan','rev','revlog','mocks','learn'].includes(CUR) ? planTracking() : ''}${CUR === 'home' ? ssc.dailyHTML() : ''}${fn()}</div>`;
+  $('#view').innerHTML = `<div class="view">${syncBanner()}${CUR === 'home' ? planTracking() : ''}${CUR === 'home' ? ssc.dailyHTML() : ''}${fn()}</div>`;
   const after = AFTER[CUR]; if (after) after();
 }
 const AFTER = {};
@@ -908,35 +926,19 @@ VIEWS.mocks = function () {
 };
 
 /* =============== Views: Notes, formulas, words =============== */
-const FORMULAS = [
-  ['Percentage', 'Successive change of a% and b%: a + b + ab/100 %'], ['Percentage', 'New value = Old × (1 ± r/100)'],
-  ['Profit and loss', 'Profit % = (SP − CP) / CP × 100;  SP = CP × (100 + P%) / 100'], ['Discount', 'Selling price = Marked price × (1 − d/100)'],
-  ['Simple interest', 'SI = P × R × T / 100'], ['Compound interest', 'A = P (1 + R/100)^n;  CI = A − P'], ['Interest', 'CI − SI for 2 years = P (R/100)²'],
-  ['Time and work', 'Together: 1/t = 1/a + 1/b, so t = ab / (a + b)'], ['Pipes', 'Net rate = sum of inlets − sum of outlets'],
-  ['Speed', 'Speed = Distance / Time;  km/h to m/s: × 5/18'], ['Average speed', 'Equal distances at x and y: 2xy / (x + y)'],
-  ['Trains', 'Cross a pole: length / speed.  Cross a platform: (length + platform) / speed'], ['Boats', 'Downstream = u + v;  upstream = u − v'],
-  ['Mixture', 'Cheaper : Dearer = (d − m) : (m − c)'], ['Algebra', '(a+b)² = a² + 2ab + b²;  (a−b)² = a² − 2ab + b²'],
-  ['Algebra', 'a² − b² = (a+b)(a−b);  a³ + b³ = (a+b)(a² − ab + b²)'], ['Algebra', 'If a + b + c = 0, then a³ + b³ + c³ = 3abc'],
-  ['Trigonometry', 'sin²θ + cos²θ = 1;  1 + tan²θ = sec²θ;  1 + cot²θ = cosec²θ'], ['Trigonometry', 'sin 30 = 1/2, sin 45 = 1/√2, sin 60 = √3/2;  tan 45 = 1'],
-  ['Mensuration', 'Circle: area πr², circumference 2πr.  Cylinder: CSA 2πrh, volume πr²h'], ['Mensuration', 'Cone volume ⅓πr²h;  Sphere surface 4πr², volume 4/3 πr³'],
-  ['Triangle', 'Area = ½ × base × height;  equilateral: √3/4 × a²;  Heron: √(s(s−a)(s−b)(s−c))'], ['Counting', 'nPr = n! / (n−r)!;  nCr = n! / (r! (n−r)!)'],
-  ['Divisibility', '3 and 9: digit sum.  4: last two digits.  8: last three digits.  11: alternate digit sum difference']
-];
 const WORDS = [
   ['Benevolent', 'Kind and generous'], ['Candid', 'Open and honest'], ['Diligent', 'Careful and hard-working'], ['Eloquent', 'Fluent and persuasive in speech'], ['Frugal', 'Careful with money'],
   ['Gregarious', 'Fond of company'], ['Hostile', 'Unfriendly, opposed'], ['Impartial', 'Treating all sides equally'], ['Jubilant', 'Feeling great joy'], ['Lucid', 'Clear and easy to understand'],
   ['Meticulous', 'Very careful about detail'], ['Nostalgia', 'Longing for the past'], ['Obsolete', 'No longer in use'], ['Pragmatic', 'Practical rather than theoretical'], ['Resilient', 'Able to recover quickly'],
   ['Scrupulous', 'Very honest and careful'], ['Tenacious', 'Holding firmly, not giving up'], ['Unanimous', 'Agreed by everyone'], ['Verbose', 'Using more words than needed'], ['Zealous', 'Full of eager enthusiasm']
 ];
-let formulaQ = '';
 VIEWS.notes = function () {
-  const q = formulaQ.toLowerCase(), f = FORMULAS.filter((x) => !q || (x[0] + ' ' + x[1]).toLowerCase().includes(q));
   const off = parseD(today()).getDate() % 2 * 10, words = WORDS.slice(off, off + 10);
   return `<div class="grid g2">
   ${card('Notes (current affairs and quick points)', `<div class="actions" style="margin-bottom:12px"><button class="btn sm" data-act="addNote">Add note</button></div><div class="list">${S.notes.slice().reverse().slice(0, 30).map((n) => `<div class="li"><div class="l"><b>${esc(n.tag || 'Note')}</b> <span class="quiet">${fmtD(n.date)}</span><div>${esc(n.text)}</div></div><button class="mini del" data-act="delNote" data-id="${n.id}" aria-label="Delete">&times;</button></div>`).join('') || '<div class="empty"><b>No notes yet</b>Add today\'s current affairs or a point you keep forgetting.</div>'}</div>`)}
   ${card('Ten words today', `<div class="list">${words.map((w) => `<div class="li"><div class="l"><b>${w[0]}</b><small>${w[1]}</small></div></div>`).join('')}</div>`)}
   </div>
-  <div class="card" style="margin-top:14px"><h3>Formula vault</h3><input class="inp srch" id="fq" placeholder="Search: percentage, algebra, trains..." value="${esc(formulaQ)}" data-chg="formulaQ" aria-label="Search formulas">${f.map((x) => `<div class="formula"><span>${x[0]}</span><code>${esc(x[1])}</code></div>`).join('') || '<p class="quiet">No match.</p>'}</div>`;
+`;
 };
 
 /* =============== Views: DHANAM Canteen =============== */
@@ -1246,7 +1248,6 @@ const CHG = {
   tField: (el) => { T[el.dataset.f] = el.value; },
   mcq: (el) => { RV.mcq = el.checked; if (QZ.qz) QZ.qz.mcq = el.checked; },
   revFilter: (el) => { revFilter = el.value; render(); },
-  formulaQ: (el) => { formulaQ = el.value; render(); const i = $('#fq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } },
   setting: (el) => { const k = el.dataset.key; S.settings[k] = el.type === 'number' ? (parseFloat(el.value) || 0) : el.value; if (k === 'pomo' || k === 'brk') tReset('focus'); persist(); toast('Saved'); },
   nameSet: (el) => { S.name = el.value.trim(); persist(); toast('Saved'); },
   planFile: () => { /* read on Import */ },
@@ -1439,13 +1440,14 @@ function runWelcome() {
   setTimeout(() => { w.hidden = true; $$('.spark', w).forEach((n) => n.remove()); enterApp(); }, 3500);
 }
 function enterApp() {
-  $('#login').hidden = true; $('#welcome').hidden = true; $('#app').hidden = false; buildNav(); show('home'); remind(); startReminders();
+  $('#login').hidden = true; $('#welcome').hidden = true; $('#app').hidden = false; buildNav(); const route = history.state?.studyTracker; if (!route) history.replaceState(routeState('home'),''); show(route?.section && VIEWS[route.view] ? route.view : 'home',true); remind(); startReminders();
 }
 function remind() {
   const c = critItems().length, m = qrMissed();
   if (c) notify(c + ' item' + (c > 1 ? 's' : '') + ' in the Critical Zone need attention.'); else if (m === 1) notify('You skipped Quick Revision yesterday. Do a set today to keep your streak.');
 }
 async function logout() {
+  if (history.state?.studyTracker?.section) history.back();
   clearTimeout(saveT); syncState.unsubscribe?.(); syncState.unsubscribe = null; syncState.generation++; syncState.saving = false;
   lsDel('sst_rem'); ssDel('sst_ses'); clearInterval(T.iv); T.running = false; T.iv = null; clearInterval(remIv);
   if (cloud.enabled) { try { await cloud.signOut(); } catch (e) { /* ignore */ } }
