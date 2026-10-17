@@ -207,6 +207,34 @@ function genPlan() {
   if (n) persist();
   return n;
 }
+// View preferences stay on this device; filtering never changes plan dates or progress.
+const backlogView = { subject: '', age: '', group: 'age' };
+const carryLabel = days => days === 0 ? 'Due today' : `Carried ${days} ${days === 1 ? 'day' : 'days'}`;
+function backlogHTML(pending) {
+  const subjects = [...new Set(pending.map(r => r.subj))].sort();
+  const ages = [...new Set(pending.map(r => diff(r.date, today())))].sort((a,b) => b-a);
+  const selected = pending.filter(r => (!backlogView.subject || r.subj === backlogView.subject) &&
+    (backlogView.age === '' || diff(r.date, today()) === Number(backlogView.age)));
+  const groups = new Map();
+  selected.forEach(r => {
+    const age = diff(r.date, today()), key = backlogView.group === 'subject' ? r.subj : age;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+  const entries = [...groups].sort((a,b) => backlogView.group === 'subject' ? a[0].localeCompare(b[0]) : b[0]-a[0]);
+  const options = (values, current, label) => values.map(v => `<option value="${esc(v)}"${String(v) === current ? ' selected' : ''}>${esc(label(v))}</option>`).join('');
+  return `<section id="plan-backlog" aria-labelledby="backlog-title"><h4 id="backlog-title">Next work to finish</h4>
+    <p class="quiet">Choose a subject or the number of calendar days carried from the original plan date. Oldest work comes first within each group. Over 3 days is critical.</p>
+    <div class="backlog-filters">
+      <div><label class="label" for="backlog-subject">Subject</label><select class="inp" id="backlog-subject" data-chg="backlogFilter" data-key="subject"><option value="">All subjects</option>${options(subjects, backlogView.subject, v=>v)}</select></div>
+      <div><label class="label" for="backlog-age">Days carried</label><select class="inp" id="backlog-age" data-chg="backlogFilter" data-key="age"><option value="">All days</option>${options(ages, backlogView.age, carryLabel)}</select></div>
+      <div><label class="label" for="backlog-group">Group by</label><select class="inp" id="backlog-group" data-chg="backlogFilter" data-key="group">${options(['age','subject'], backlogView.group, v=>v==='age'?'Days carried':'Subject')}</select></div>
+    </div>
+    <p class="quiet" role="status">${selected.length} of ${pending.length} pending lessons · ${sum(selected,r=>r.gap)} min left. Achievement totals above include all subjects.</p>
+    ${entries.map(([key,rows])=>`<details class="backlog-group" open><summary>${esc(backlogView.group==='subject'?key:carryLabel(key))} <span class="quiet">· ${rows.length} lessons · ${sum(rows,r=>r.gap)} min left</span></summary>
+      ${rows.map(r=>{const age=diff(r.date,today());return `<article class="backlog-row"><div><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Plan day ${r.day} · ${fmtD(r.date)} · ${r.gap} min left</small><span class="badge${age?' amber':''}">${carryLabel(age)}${age>3?' · Critical':''}</span></div>${r.task?`<button class="btn sm ghost" data-act="partial" data-id="${esc(r.task.id)}">Log progress</button>`:''}</article>`;}).join('')}</details>`).join('') || '<p class="quiet">No pending lessons match these filters. Choose All subjects and All days to see the full list.</p>'}
+    </section>`;
+}
 function planTracking() {
   if (!S.plan.length) return card('Plan tracking', '<p class="quiet">Load your SSC plan to track achievement, gaps and warnings.</p>');
   const t = today(), byKey = new Map(S.tasks.filter(k => k.pk).map(k => [k.pk, k]));
@@ -227,7 +255,7 @@ function planTracking() {
   </div><p class="quiet">Achievement counts minutes recorded against plan tasks, including manual completion. Extra study, revision drills and mock scores remain separate. Future work and skipped dates are excluded from the gap.</p>
   ${overdue.length ? `<p class="err" role="status">Warning: ${overdue.length} overdue topics; ${hrs(sum(overdue,r=>r.gap))} hours to catch up.</p>` : `<p class="quiet">${gap ? 'Today’s plan is still in progress.' : due.length ? 'All work due so far is achieved.' : 'Your plan has not started yet.'}</p>`}
   <div class="tablewrap"><table><thead><tr><th>Subject</th><th>Planned</th><th>Achieved</th><th>Gap</th></tr></thead><tbody>${subjects.map(subj=>{const group=due.filter(r=>r.subj===subj);return `<tr><td>${esc(subj)}</td><td>${hrs(sum(group,r=>r.min))} h</td><td>${hrs(sum(group,r=>r.achieved))} h</td><td>${hrs(sum(group,r=>r.gap))} h</td></tr>`;}).join('')}</tbody></table></div>
-  <h4>Next work to finish</h4>${pending.slice(0,10).map(r=>`<div class="li"><div class="l"><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Day ${r.day} · ${fmtD(r.date)} · ${r.gap} min left · ${r.date<t ? diff(r.date,t)>3 ? 'Critical' : 'Overdue' : 'Due today'}</small></div>${r.task ? `<button class="btn sm ghost" data-act="partial" data-id="${r.task.id}">Log progress</button>` : ''}</div>`).join('')}${pending.length>10?`<p class="quiet">${pending.length-10} more pending topics appear in Home’s schedule.</p>`:''}`, ' style="margin-bottom:14px"');
+  ${backlogHTML(pending)}`, ' style="margin-bottom:14px"');
 }
 function rollover() {
   const t = today(); let ch = false;
@@ -1242,6 +1270,14 @@ ACT.mathModelPractice = d => {
   }});
 };
 const CHG = {
+  backlogFilter: el => {
+    if (!Object.hasOwn(backlogView, el.dataset.key)) return;
+    backlogView[el.dataset.key] = el.value;
+    const y = window.scrollY, id = el.id;
+    render();
+    document.getElementById(id)?.focus({preventScroll:true});
+    window.scrollTo(0,y);
+  },
   masterclassDay: el => { S.masterclassDays = Array.isArray(S.masterclassDays) ? S.masterclassDays : []; const id = 'day:'+el.dataset.day; S.masterclassDays = S.masterclassDays.filter(day=>day.id!==id); if (el.checked) S.masterclassDays.push({id,date:today(),at:Date.now()}); persist(); },
   tableChoice: el => { clearInterval(QZ.qz?.iv); delete QZ.qz; FL = null; RV[el.dataset.key] = el.dataset.key === 'tableLimit' ? Number(el.value) : el.value; lsSet('sst_tableBase',RV.tableBase); lsSet('sst_tableLimit',String(RV.tableLimit)); render(); if (RV.mode === 'practice') ACT.qzStartRev(); },
   toggleTask: (el) => { const complete = el.checked; setTaskDone(el.dataset.id, complete); render(); if (complete) toast('Lesson achieved — one step closer'); },

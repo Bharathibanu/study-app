@@ -603,3 +603,8 @@ SSC event actions and screen behaviour are covered in [SSC CGL preparation tools
 ## Maintenance priorities for future work
 
 Server confirmation, basic conflict handling and a document-size guard have been added. Future work should cover a permitted and verified PYQ collection, larger multi-document storage, broader schema validation and production sync testing. A native APK is optional; it is not required for current study tracking and would not automatically fix database design.
+
+
+### Prioritise carried lessons on Home
+
+Under **Achievement against my plan → Next work to finish**, filter unfinished plan lessons by subject and exact days carried (today, 1 day, 2 days, or any older count). Group by days carried or subject. Each group shows its lesson count and remaining minutes; open or collapse it to browse the full backlog. Oldest lessons come first within each group, with more than 3 days marked Critical. Carry age uses the original plan date, so moving a task to today does not hide its age. Completed, future, and skipped plan dates are excluded. Filters affect this list only; achievement totals and today's schedule still cover the full plan. Changing a filter does not change stored data.

@@ -387,3 +387,14 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 #masterclass-test{margin-top:14px}
 
 .page-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}.page-heading h2{overflow-wrap:anywhere}#backHome{flex-shrink:0}
+
+/* Plan backlog: independent filters and readable phone-sized lesson rows. */
+.backlog-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+.backlog-filters .inp{width:100%;min-width:0}
+.backlog-group{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.backlog-group summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}
+.backlog-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line);margin-top:10px}
+.backlog-row>div{min-width:0;overflow-wrap:anywhere}
+.backlog-row small{display:block;color:var(--muted);margin:6px 0;line-height:1.6}
+.backlog-row .btn{flex-shrink:0}
+@media(max-width:600px){.backlog-filters{grid-template-columns:1fr}.backlog-row{align-items:flex-start;flex-direction:column}}
