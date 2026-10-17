@@ -5,7 +5,7 @@ import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
-import { clone, sameState, mergeStates } from './ssc-core.js';
+import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -101,7 +101,7 @@ const blank = () => ({
   v: 1, _u: 0, created: today(), name: '',
   settings: { target: 6, budget: 6000, exam: '', pomo: 25, brk: 5, why: '', day1: '' },
   plan: [], planFrom: '', tasks: [], logs: [], rev: [], exp: [], meet: [], qr: [], mist: [], mocks: [], notes: [], mastered: {},
-  practice: [], mistakeBook: [], revisionHistory: [], mockAnalyses: [], masterclassDays: [],
+  dailyFocus: {}, practice: [], mistakeBook: [], revisionHistory: [], mockAnalyses: [], masterclassDays: [],
   canteen: { prices: { tea: 12, snack: 10, lunch: 52 }, days: {} }, todos: [], books: [], learn: [], diary: []
 });
 function loadLocal() {
@@ -209,6 +209,11 @@ function genPlan() {
 }
 // View preferences stay on this device; filtering never changes plan dates or progress.
 const backlogView = { subject: '', age: '', group: 'age' };
+const focusPrefs = () => { S.dailyFocus ||= {}; return S.dailyFocus[today()] ||= {pins: []}; };
+function pinButton(id) {
+  const pinned=(S.dailyFocus?.[today()]?.pins || []).includes(id);
+  return `<button class="btn sm ghost" data-act="pinLesson" data-id="${esc(id)}" aria-pressed="${pinned}">${pinned?'Unpin':'Pin today'}</button>`;
+}
 const carryLabel = days => days === 0 ? 'Due today' : `Carried ${days} ${days === 1 ? 'day' : 'days'}`;
 function backlogHTML(pending) {
   const subjects = [...new Set(pending.map(r => r.subj))].sort();
@@ -232,8 +237,17 @@ function backlogHTML(pending) {
     </div>
     <p class="quiet" role="status">${selected.length} of ${pending.length} pending lessons · ${sum(selected,r=>r.gap)} min left. Achievement totals above include all subjects.</p>
     ${entries.map(([key,rows])=>`<details class="backlog-group" open><summary>${esc(backlogView.group==='subject'?key:carryLabel(key))} <span class="quiet">· ${rows.length} lessons · ${sum(rows,r=>r.gap)} min left</span></summary>
-      ${rows.map(r=>{const age=diff(r.date,today());return `<article class="backlog-row"><div><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Plan day ${r.day} · ${fmtD(r.date)} · ${r.gap} min left</small><span class="badge${age?' amber':''}">${carryLabel(age)}${age>3?' · Critical':''}</span></div>${r.task?`<button class="btn sm ghost" data-act="partial" data-id="${esc(r.task.id)}">Log progress</button>`:''}</article>`;}).join('')}</details>`).join('') || '<p class="quiet">No pending lessons match these filters. Choose All subjects and All days to see the full list.</p>'}
+      ${rows.map(r=>{const age=diff(r.date,today());return `<article class="backlog-row"><div><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Plan day ${r.day} · ${fmtD(r.date)} · ${r.gap} min left</small><span class="badge${age?' amber':''}">${carryLabel(age)}${age>3?' · Critical':''}</span></div>${r.task?`<div class="actions"><button class="btn sm ghost" data-act="partial" data-id="${esc(r.task.id)}">Log progress</button>${pinButton(r.task.id)}</div>`:''}</article>`;}).join('')}</details>`).join('') || '<p class="quiet">No pending lessons match these filters. Choose All subjects and All days to see the full list.</p>'}
     </section>`;
+}
+function dailyPlannerHTML() {
+  const f = dailyFocusSummary(S,today()), week=weeklySubjectReview(S,today());
+  const priorities = f.pins.map(r=>`<li><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>${r.gap} min left</small><div class="actions">${pinButton(r.id)}<button class="btn sm" data-act="partial" data-id="${esc(r.id)}">Log progress</button></div></li>`).join('');
+  return card('My three priorities today', `<p class="quiet">Pin up to three unfinished lessons using “Pin today” in the plan list or schedule. Pins are for this date and sync to your account.</p><ol class="priority-list">${priorities || '<li>No priorities pinned yet.</li>'}</ol>`, ' style="margin-bottom:14px"') +
+    card('Daily catch-up target', `<p>${f.available===null?'Set your remaining study time for today.':`Remaining time set: <b>${f.available} min</b>. Today’s unfinished plan: <b>${f.todayMinutes} min</b>. Overdue plan: <b>${f.backlog} min</b>.`}</p><button class="btn sm ghost" data-act="catchupTime">Set remaining time</button>
+    ${f.available===null?'':`<p role="status">Catch-up target: <b>${f.target} min</b>${f.shortfall?` · Today’s plan exceeds your remaining time by ${f.shortfall} min.`:'.'}</p><p class="quiet">Today’s plan gets time first; the remaining time goes to overdue lessons. Pinned overdue lessons come first, then oldest work. This is a suggestion; it does not move dates or record study time. Update remaining time as your day changes. Extra tasks and revision need their own time allowance.</p>
+    <ul class="priority-list">${f.chunks.map(r=>`<li>${esc(r.subj)} · ${esc(r.topic)} <b>${r.minutes} min${r.minutes<r.gap?' (part of lesson)':''}</b></li>`).join('') || '<li>No catch-up work fits this time allowance.</li>'}</ul>`}`, ' style="margin-bottom:14px"') +
+    card('Weekly subject review', `<p class="quiet">${fmtD(week.since)}–${fmtD(today())} (last 7 days). Study and questions use this period. Backlog shows all overdue plan lessons as of today. Accuracy uses attempted questions; speed uses timed attempts only.</p><div class="tablewrap"><table><thead><tr><th>Subject</th><th>Study</th><th>Backlog</th><th>Attempted</th><th>Accuracy</th><th>Seconds / question</th></tr></thead><tbody>${week.rows.map(r=>`<tr><td>${esc(r.subj)}</td><td>${r.minutes} min</td><td>${r.backlogTopics} lessons · ${r.backlogMinutes} min</td><td>${r.attempted}</td><td>${r.accuracy===null?'No attempts':r.accuracy.toFixed(1)+'%'}</td><td>${r.seconds===null?'Not timed':r.seconds.toFixed(1)}</td></tr>`).join('') || '<tr><td colspan="6">No study, question attempts or plan backlog yet.</td></tr>'}</tbody></table></div>`, ' style="margin-bottom:14px"');
 }
 function planTracking() {
   if (!S.plan.length) return card('Plan tracking', '<p class="quiet">Load your SSC plan to track achievement, gaps and warnings.</p>');
@@ -459,7 +473,7 @@ function render() {
   $('#vtitle').textContent = TITLES[CUR] || '';
   $('#backHome').hidden = CUR === 'home';
   const fn = VIEWS[CUR] || VIEWS.home;
-  $('#view').innerHTML = `<div class="view">${syncBanner()}${CUR === 'home' ? planTracking() : ''}${CUR === 'home' ? ssc.dailyHTML() : ''}${fn()}</div>`;
+  $('#view').innerHTML = `<div class="view">${syncBanner()}${CUR === 'home' ? planTracking() : ''}${CUR === 'home' ? dailyPlannerHTML() + ssc.dailyHTML() : ''}${fn()}</div>`;
   const after = AFTER[CUR]; if (after) after();
 }
 const AFTER = {};
@@ -500,7 +514,7 @@ VIEWS.home = function () {
   const taskRows = tk.length ? tk.map((k) => {
     const c = carried(k), tag = !k.done && c ? `<span class="badge amber" style="margin-left:6px">${c === 1 ? 'Carried from yesterday' : 'Carried ' + c + ' days'}</span>` : '';
     const left = k.plan - k.spent, partial = !k.done && k.spent > 0 ? ` · ${left} min left` : '';
-    return `<div class="trow"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${k.id}"${k.done ? ' checked' : ''}><span class="tick">${ICON.chk}</span><span class="t"><b>${esc(k.subj)}${tag}</b><span>${esc(k.topic)}${partial}</span></span><span class="m">${k.plan} min</span></label>${k.done ? '' : `<button class="mini" data-act="partial" data-id="${k.id}" title="Log part of this task" aria-label="Log part done">Part</button>`}<button class="mini" data-act="sscTopicPractice" data-topic="${esc(k.topic)}" data-subj="${esc(k.subj)}">Practice</button><button class="mini del" data-act="delTask" data-id="${k.id}" title="Remove" aria-label="Remove task">&times;</button></div>`;
+    return `<div class="trow"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${k.id}"${k.done ? ' checked' : ''}><span class="tick">${ICON.chk}</span><span class="t"><b>${esc(k.subj)}${tag}</b><span>${esc(k.topic)}${partial}</span></span><span class="m">${k.plan} min</span></label>${k.done ? '' : pinButton(k.id)}${k.done ? '' : `<button class="mini" data-act="partial" data-id="${k.id}" title="Log part of this task" aria-label="Log part done">Part</button>`}<button class="mini" data-act="sscTopicPractice" data-topic="${esc(k.topic)}" data-subj="${esc(k.subj)}">Practice</button><button class="mini del" data-act="delTask" data-id="${k.id}" title="Remove" aria-label="Remove task">&times;</button></div>`;
   }).join('') : `<div class="empty"><b>Nothing planned for today</b>Add a task, or upload your 200-day plan so each day fills in by itself.<div class="actions" style="justify-content:center;margin-top:10px"><button class="btn sm" data-act="addTask">Add task</button><button class="btn sm ghost" data-act="nav" data-v="plan">Upload plan</button></div></div>`;
 
   const cT = cTotal(t);
@@ -1158,6 +1172,22 @@ function download(name, text, type) {
 }
 function applyTheme() { const th = lsGet('sst_theme'); if (th) document.documentElement.dataset.theme = th; }
 const ACT = {
+  pinLesson: d => {
+    const f=dailyFocusSummary(S,today()), prefs=focusPrefs();
+    const pins=f.pins.map(p=>p.id);
+    if(pins.includes(d.id)) prefs.pins=pins.filter(id=>id!==d.id);
+    else {
+      if(pins.length>=3){toast('Three priorities already pinned. Unpin one first.');return;}
+      const task=S.tasks.find(t=>t.id===d.id);
+      if(!task || task.done || task.spent>=task.plan){toast('This lesson is already finished.');return;}
+      prefs.pins=[...pins,d.id];
+    }
+    persist();render();
+  },
+  catchupTime: () => openForm('Remaining study time today', [{k:'minutes',label:'Minutes still available today (after breaks and other commitments)',type:'number',min:0,req:1,value:dailyFocusSummary(S,today()).available ?? 60}], 'Set time', v => {
+    if(!Number.isFinite(v.minutes) || v.minutes<0){toast('Enter zero or a positive number of minutes.');return;}
+    focusPrefs().available=v.minutes;persist();render();
+  }),
   nav: (d) => show(d.v),
   theme: () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; lsSet('sst_theme', r.dataset.theme); if (CUR === 'set') render(); },
   logout: () => logout(),

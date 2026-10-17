@@ -398,3 +398,6 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 .backlog-row small{display:block;color:var(--muted);margin:6px 0;line-height:1.6}
 .backlog-row .btn{flex-shrink:0}
 @media(max-width:600px){.backlog-filters{grid-template-columns:1fr}.backlog-row{align-items:flex-start;flex-direction:column}}
+
+.priority-list{padding-left:24px;margin-top:12px}.priority-list li{padding:10px 0;overflow-wrap:anywhere}.priority-list small{display:block;color:var(--muted);margin:6px 0}.priority-list .actions{margin-top:8px}
+.backlog-row .actions{flex-shrink:0}

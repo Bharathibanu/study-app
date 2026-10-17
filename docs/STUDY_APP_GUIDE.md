@@ -608,3 +608,12 @@ Server confirmation, basic conflict handling and a document-size guard have been
 ### Prioritise carried lessons on Home
 
 Under **Achievement against my plan → Next work to finish**, filter unfinished plan lessons by subject and exact days carried (today, 1 day, 2 days, or any older count). Group by days carried or subject. Each group shows its lesson count and remaining minutes; open or collapse it to browse the full backlog. Oldest lessons come first within each group, with more than 3 days marked Critical. Carry age uses the original plan date, so moving a task to today does not hide its age. Completed, future, and skipped plan dates are excluded. Filters affect this list only; achievement totals and today's schedule still cover the full plan. Changing a filter does not change stored data.
+
+
+### Daily priorities, catch-up and weekly review
+
+Home now has **My three priorities today**. Use **Pin today** beside an unfinished plan lesson or schedule task. Up to three active pins are allowed; completing one frees a place. Pins are date-specific and sync with the account. A new date starts without yesterday's pins.
+
+In **Daily catch-up target**, set minutes still available today. The suggestion reserves time for today's remaining plan and assigns any surplus to overdue plan lessons, pinned first and then oldest first. A lesson can receive a partial time allocation. It never changes dates or marks work done. Adjust remaining time during the day and allow separately for manual tasks and revision.
+
+**Weekly subject review** covers the last seven calendar days including today: logged study minutes, attempted-question accuracy and average seconds per timed question. Untimed attempts affect accuracy but not speed. Backlog includes all overdue unfinished plan lessons, excluding future and skipped dates. Empty results display “No attempts” / “Not timed”. Study logs alone never complete a plan lesson.

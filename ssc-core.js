@@ -6,7 +6,7 @@ export const clone = value => value == null ? value : JSON.parse(JSON.stringify(
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 const stable = value => value === undefined ? 'undefined' : JSON.stringify(value, (_, v) => object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v);
 export const same = (a,b) => stable(a) === stable(b);
-export function content(state) { const copy = clone(state); if (copy) { delete copy._u; delete copy._sync; for (const key of ['practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays']) if (!copy[key] || Array.isArray(copy[key]) && !copy[key].length) delete copy[key]; } return copy; }
+export function content(state) { const copy = clone(state); if (copy) { delete copy._u; delete copy._sync; if (!copy.dailyFocus || object(copy.dailyFocus) && !Object.keys(copy.dailyFocus).length) delete copy.dailyFocus; for (const key of ['practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays']) if (!copy[key] || Array.isArray(copy[key]) && !copy[key].length) delete copy[key]; } return copy; }
 export const sameState = (a,b) => same(content(a),content(b));
 const identity = (row,path) => row && row.id != null ? String(row.id) : path === 'plan' && row ? [row.date,row.subj,row.topic].join('|') : null;
 export function mergeStates(base, local, remote) {
@@ -117,4 +117,40 @@ export function validateBank(input) {
 export function validateAttempt(v) {
   if(!Number.isInteger(v.attempted)||v.attempted<0||!Number.isInteger(v.correct)||v.correct<0||v.correct>v.attempted||!Number.isInteger(v.skipped)||v.skipped<0||!Number.isFinite(v.seconds)||v.seconds<0||v.attempted+v.skipped<1)throw new Error('Enter whole question counts; correct cannot exceed attempted. Time must be non-negative.');
   return v;
+}
+
+
+// Plan gaps stay separate from unrelated study logs and practice results.
+export function pendingPlan(state, today) {
+  const tasks = new Map((state.tasks || []).filter(t=>t.pk).map(t=>[t.pk,t]));
+  return (state.plan || []).filter(r=>r.date<=today && (!state.planFrom || r.date>=state.planFrom)).map(r=>{
+    const key=[r.date,r.subj,r.topic].join('|'), task=tasks.get(key);
+    return {...r,id:task?.id || 'plan:'+key,gap:Math.max(0,r.min-Math.max(0,Number(task?.spent)||0))};
+  }).filter(r=>r.gap>0).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
+}
+export function dailyFocusSummary(state,today) {
+  const pending=pendingPlan(state,today), prefs=state.dailyFocus?.[today] || {};
+  const manual=(state.tasks || []).filter(t=>!t.pk && !t.done && t.date<=today && t.plan>t.spent)
+    .map(t=>({...t,gap:t.plan-t.spent,date:t.orig || t.date}));
+  const active=new Map([...pending,...manual].map(r=>[r.id,r]));
+  const pins=[...new Set(prefs.pins || [])].map(id=>active.get(id)).filter(Boolean).slice(0,3);
+  const available=Number.isFinite(prefs.available) && prefs.available>=0 ? prefs.available : null;
+  const todayMinutes=pending.filter(r=>r.date===today).reduce((s,r)=>s+r.gap,0);
+  const overdue=pending.filter(r=>r.date<today), backlog=overdue.reduce((s,r)=>s+r.gap,0);
+  let budget=available===null?0:Math.max(0,available-todayMinutes);
+  const target=Math.min(backlog,budget), chunks=[];
+  overdue.sort((a,b)=>Number(pins.some(p=>p.id===b.id))-Number(pins.some(p=>p.id===a.id))||a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
+  for(const r of overdue){const minutes=Math.min(r.gap,budget);if(minutes>0)chunks.push({...r,minutes});budget-=minutes;}
+  return {pins,available,todayMinutes,backlog,target,chunks,shortfall:available===null?0:Math.max(0,todayMinutes-available)};
+}
+export function weeklySubjectReview(state,today) {
+  const since=addDays(today,-6), groups=new Map();
+  const row=subj=>{if(!groups.has(subj))groups.set(subj,{subj,minutes:0,backlogMinutes:0,backlogTopics:0,attempted:0,correct:0,timedSeconds:0,timedAttempts:0});return groups.get(subj);};
+  for(const r of pendingPlan(state,today)){const g=row(r.subj);if(r.date<today){g.backlogMinutes+=r.gap;g.backlogTopics++;}}
+  for(const log of state.logs || [])if(log.date>=since && log.date<=today)row(log.subj).minutes+=Math.max(0,Number(log.min)||0);
+  for(const a of state.practice || [])if(a.date>=since && a.date<=today){
+    const g=row(a.subj), attempted=Math.max(0,Number(a.attempted)||0);g.attempted+=attempted;g.correct+=Math.max(0,Number(a.correct)||0);
+    if(attempted>0 && a.seconds>0){g.timedAttempts+=attempted;g.timedSeconds+=Number(a.seconds);}
+  }
+  return {since,rows:[...groups.values()].sort((a,b)=>a.subj.localeCompare(b.subj)).map(g=>({...g,accuracy:g.attempted?g.correct/g.attempted*100:null,seconds:g.timedAttempts?g.timedSeconds/g.timedAttempts:null}))};
 }
