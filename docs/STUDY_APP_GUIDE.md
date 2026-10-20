@@ -617,3 +617,12 @@ Home now has **My three priorities today**. Use **Pin today** beside an unfinish
 In **Daily catch-up target**, set minutes still available today. The suggestion reserves time for today's remaining plan and assigns any surplus to overdue plan lessons, pinned first and then oldest first. A lesson can receive a partial time allocation. It never changes dates or marks work done. Adjust remaining time during the day and allow separately for manual tasks and revision.
 
 **Weekly subject review** covers the last seven calendar days including today: logged study minutes, attempted-question accuracy and average seconds per timed question. Untimed attempts affect accuracy but not speed. Backlog includes all overdue unfinished plan lessons, excluding future and skipped dates. Empty results display “No attempts” / “Not timed”. Study logs alone never complete a plan lesson.
+
+
+### Recovery timetable
+
+Home’s **Backlog recovery plan** spreads the current overdue plan workload across seven days, using Morning **04:00–08:00**, Evening **19:00–20:00** and Night **21:00–22:30** (390 minutes / 6.5 hours per full day). **Edit study windows** changes all three windows, a 1–30-day recovery horizon, and a default 30-minute daily reserve for breaks/revision. These preferences save locally and sync in account settings.
+
+Each date reserves its remaining original plan lessons and manual tasks first, then breaks/revision; catch-up fills spare time evenly across dates with capacity. Pinned backlog comes first, then oldest work, with partial lessons permitted. Today excludes elapsed clock time and respects any manually entered remaining-time limit. Future dates use full windows. The device’s local clock supplies dates/times. Full or overloaded days get no extra work, and any unallocated backlog is reported rather than hidden.
+
+Expand a date to see catch-up time ranges and original lesson details. Log progress for today, or Refresh plan after time has passed. The suggestion rolls forward and recalculates from actual remaining work; it does not reschedule original tasks, change achievement totals, create calendar bookings, or guarantee that future study will happen. The separate daily target shows maximum catch-up capacity; the multi-day plan spreads that capacity across days. Increase the reserve for longer breaks/reviews or other commitments.
