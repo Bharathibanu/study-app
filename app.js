@@ -5,7 +5,7 @@ import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
-import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, backlogRecovery, recoveryConfig, validateRecovery } from './ssc-core.js';
+import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, backlogRecovery, recoveryConfig, validateRecovery, postponePlan, validateBackup, validStudyDate, validatePlanRows } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -28,7 +28,7 @@ const sum = (a, f) => a.reduce((s, x) => s + (f ? f(x) : x), 0);
 const inr = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
 const hrs = (min) => (min / 60).toFixed(1);
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } };
 const lsDel = (k) => { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } };
 const ssGet = (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
 const ssSet = (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) { /* ignore */ } };
@@ -95,6 +95,7 @@ Object.assign(ICON, { practice: ICON.rev, mistakes: ICON.notes, revisionQueue: I
 Object.assign(TITLES, { practice: 'SSC CGL Topic Practice', mistakes: 'Mistake Notebook', revisionQueue: 'Automatic Revision Queue', mockAnalysis: 'CGL Mock Analysis', pyq: '2024–2025 SSC PYQ Bank' });
 
 /* =============== State =============== */
+let deviceSaveProblem = '';
 let S = null, KEY = 'sst_state_local', UID = null, saveT = null, CUR = 'home', welcomeNext = false;
 
 const blank = () => ({
@@ -104,23 +105,36 @@ const blank = () => ({
   dailyFocus: {}, practice: [], mistakeBook: [], revisionHistory: [], mockAnalyses: [], masterclassDays: [],
   canteen: { prices: { tea: 12, snack: 10, lunch: 52 }, days: {} }, todos: [], books: [], learn: [], diary: []
 });
+function cleanSettings(value) {
+  const settings=Object.assign(blank().settings,value || {}), defaults=blank().settings;
+  for(const [key,min] of Object.entries({target:1,budget:0,pomo:5,brk:1}))if(!Number.isFinite(settings[key]) || settings[key]<min)settings[key]=defaults[key];
+  return settings;
+}
+function saveDeviceCopy() {
+  const saved=lsSet(KEY,JSON.stringify(S)), previous=deviceSaveProblem;
+  deviceSaveProblem=saved?'':'This device could not save your changes. Keep the app open and export a backup. Free storage or allow site storage, then try saving again.';
+  if(!saved && !previous)toast('Device save failed. Keep the app open and export a backup.');
+  return saved;
+}
 function loadLocal() {
   let r = null;
   try { const raw = lsGet(KEY); r = raw ? JSON.parse(raw) : null; } catch (e) { r = null; }
   const b = blank();
   S = Object.assign(b, r || {});
-  S.settings = Object.assign(blank().settings, (r && r.settings) || {});
+  S.settings = cleanSettings(r?.settings);
 }
 function setSync(t) { const el = $('#sync'); if (el) el.textContent = t; }
 const syncState = { base: null, legacyCandidate: null, dirty: false, saving: false, generation: 0, unsubscribe: null, conflict: null, problem: '', acknowledged: '' };
 function applyAccount(value) {
   S = Object.assign(blank(), value || {});
-  S.settings = Object.assign(blank().settings, value?.settings || {});
-  ssc.ensure(); lsSet(KEY, JSON.stringify(S));
+  S.settings = cleanSettings(value?.settings);
+  ssc.ensure(); saveDeviceCopy();
 }
 function persist() {
   S._u = Date.now();
-  lsSet(KEY, JSON.stringify(S));
+  const deviceSaved=saveDeviceCopy();
+  if(!deviceSaved)setSync('Device save failed · export backup');
+  else if(!UID)setSync('This device only');
   if (UID && cloud.enabled) {
     syncState.dirty = true;
     setSync(syncState.conflict ? 'Conflict · changes saved locally' : navigator.onLine ? 'Saved locally · syncing…' : 'Saved locally · offline');
@@ -185,10 +199,11 @@ function onRemote(data, fromCache = false) {
   if (syncState.dirty) syncAccount(); else setSync('Synced · server confirmed');
 }
 function syncBanner() {
-  if (!UID) return '';
-  if (syncState.conflict) return `<div class="sync-banner" role="alert"><b>Two device copies need review</b><p>Both devices changed the same record. Automatic overwrite is paused. Export both copies before choosing which account copy to keep. This choice replaces the whole cloud/device account state.</p><div class="actions"><button class="btn sm ghost" data-act="syncExportDevice">Export this device copy</button><button class="btn sm ghost" data-act="syncExportServer">Export server copy</button><button class="btn sm" data-act="syncUseServer">Use server copy</button><button class="btn sm ghost" data-act="syncUseDevice">Keep device copy</button></div></div>`;
-  if (syncState.problem) return `<div class="sync-banner" role="alert"><p>${esc(syncState.problem)}</p><button class="btn sm" data-act="syncRetry">Retry save</button><button class="btn sm ghost" data-act="exportData">Export backup</button></div>`;
-  return '';
+  const deviceWarning=deviceSaveProblem?`<div class="sync-banner" role="alert"><p>${esc(deviceSaveProblem)}</p><button class="btn sm ghost" data-act="exportData">Export backup</button></div>`:'';
+  if (!UID) return deviceWarning;
+  if (syncState.conflict) return deviceWarning + `<div class="sync-banner" role="alert"><b>Two device copies need review</b><p>Both devices changed the same record. Automatic overwrite is paused. Export both copies before choosing which account copy to keep. This choice replaces the whole cloud/device account state.</p><div class="actions"><button class="btn sm ghost" data-act="syncExportDevice">Export this device copy</button><button class="btn sm ghost" data-act="syncExportServer">Export server copy</button><button class="btn sm" data-act="syncUseServer">Use server copy</button><button class="btn sm ghost" data-act="syncUseDevice">Keep device copy</button></div></div>`;
+  if (syncState.problem) return deviceWarning + `<div class="sync-banner" role="alert"><p>${esc(syncState.problem)}</p><button class="btn sm" data-act="syncRetry">Retry save</button><button class="btn sm ghost" data-act="exportData">Export backup</button></div>`;
+  return deviceWarning;
 }
 function dataChanged() { rollover(); genPlan(); if (!$('#app').hidden && $('#modal').hidden && CUR !== 'study') render(); }
 
@@ -237,7 +252,7 @@ function backlogHTML(pending) {
     </div>
     <p class="quiet" role="status">${selected.length} of ${pending.length} pending lessons · ${sum(selected,r=>r.gap)} min left. Achievement totals above include all subjects.</p>
     ${entries.map(([key,rows])=>`<details class="backlog-group" open><summary>${esc(backlogView.group==='subject'?key:carryLabel(key))} <span class="quiet">· ${rows.length} lessons · ${sum(rows,r=>r.gap)} min left</span></summary>
-      ${rows.map(r=>{const age=diff(r.date,today());return `<article class="backlog-row"><div><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Plan day ${r.day} · ${fmtD(r.date)} · ${r.gap} min left</small><span class="badge${age?' amber':''}">${carryLabel(age)}${age>3?' · Critical':''}</span></div>${r.task?`<div class="actions"><button class="btn sm ghost" data-act="partial" data-id="${esc(r.task.id)}">Log progress</button>${pinButton(r.task.id)}</div>`:''}</article>`;}).join('')}</details>`).join('') || '<p class="quiet">No pending lessons match these filters. Choose All subjects and All days to see the full list.</p>'}
+      ${rows.map(r=>{const age=diff(r.date,today());return `<article class="backlog-row"><div><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Plan day ${esc(r.day)} · ${fmtD(r.date)} · ${r.gap} min left</small><span class="badge${age?' amber':''}">${carryLabel(age)}${age>3?' · Critical':''}</span></div>${r.task?`<div class="actions"><button class="btn sm ghost" data-act="partial" data-id="${esc(r.task.id)}">Log progress</button>${pinButton(r.task.id)}</div>`:''}</article>`;}).join('')}</details>`).join('') || '<p class="quiet">No pending lessons match these filters. Choose All subjects and All days to see the full list.</p>'}
     </section>`;
 }
 const clockLabel = minute => { const h=Math.floor(minute/60), m=Math.floor(minute%60); return `${h%12 || 12}:${pad(m)} ${h<12?'AM':'PM'}`; };
@@ -251,7 +266,7 @@ function recoveryHTML() {
     <div class="recovery-days">${r.days.map((d,i)=>`<details class="recovery-day" data-date="${esc(d.date)}"${i===0?' open':''}><summary><b>${esc(longD(d.date))}</b><span>${d.target} min catch-up · ${d.available} min available</span></summary>
       <p class="quiet">Daily lessons/tasks: ${d.regular} min (${d.reserved} min reserved). Breaks/revision: ${d.buffer} min reserved.</p>
       ${d.shortfall?`<p class="err">Daily lessons/tasks exceed available time by ${d.shortfall} min. No backlog is added to this day.</p>`:''}
-      ${d.chunks.map(c=>`<article class="recovery-chunk"><div><b>${esc(c.subj)} · ${esc(c.topic)}</b><small>${esc(clockLabel(c.start))}–${esc(clockLabel(c.end))} · ${c.minutes} min · Original plan day ${c.day} (${fmtD(c.date)})</small></div>${i===0?`<button class="btn sm ghost" data-act="partial" data-id="${esc(c.id)}">Log progress</button>`:''}</article>`).join('') || '<p class="quiet">No catch-up allocated to this day.</p>'}
+      ${d.chunks.map(c=>`<article class="recovery-chunk"><div><b>${esc(c.subj)} · ${esc(c.topic)}</b><small>${esc(clockLabel(c.start))}–${esc(clockLabel(c.end))} · ${c.minutes} min · Original plan day ${esc(c.day)} (${fmtD(c.date)})</small></div>${i===0?`<button class="btn sm ghost" data-act="partial" data-id="${esc(c.id)}">Log progress</button>`:''}</article>`).join('') || '<p class="quiet">No catch-up allocated to this day.</p>'}
       </details>`).join('')}</div><p class="quiet">Suggestions recalculate when you log progress, reopen Home or select Refresh plan. They are not calendar bookings. The daily catch-up target above shows the maximum spare time; this recovery plan spreads work more evenly. Increase the reserve if breaks or revision need longer.</p>`, ' id="recovery-plan" style="margin-bottom:14px"');
 }
 function dailyPlannerHTML() {
@@ -453,7 +468,7 @@ function donutSVG(parts) {
 function buildNav() {
   const prim = NAV.filter((n) => n.prim);
   $('#side').innerHTML = `<div class="brandmark"><img class="logo" src="icons/logo-192.png" alt="Study Tracker logo"><div class="bname">Study Tracker<small>SSC plan</small></div></div>` +
-    NAV.map((n) => `<button class="nav${n.prim ? '' : ' sec'}" data-act="nav" data-v="${n.id}">${ICON[n.id]}<span>${esc(n.short || n.label)}</span></button>`).join('') +
+    NAV.map((n) => `<button class="nav${n.prim ? '' : ' sec'}" data-act="nav" data-v="${esc(n.id)}">${ICON[n.id]}<span>${esc(n.short || n.label)}</span></button>`).join('') +
     `<button class="nav moreb" data-act="nav" data-v="more">${ICON.more}<span>More</span></button>`;
   $('#themeBtn').innerHTML = ICON.theme; $('#outBtn').innerHTML = ICON.out; $('#eye').innerHTML = ICON.eye;
   return prim;
@@ -522,13 +537,13 @@ VIEWS.home = function () {
 
   const critHtml = crit.length ? `<div class="card critical"><h3>${ICON.alert}Critical zone: needs attention</h3>${crit.map((c) => c.type === 'qr'
     ? `<div class="crit-item"><div><b>Quick Revision</b><br><span class="quiet">No drill for ${c.days} days in a row</span></div><div class="actions"><span class="badge">Missed ${c.days} days</span><button class="btn sm" data-act="nav" data-v="rev">Practise now</button></div></div>`
-    : `<div class="crit-item"><div><b>${esc(c.k.subj)}</b><br><span class="quiet">${esc(c.k.topic)} · ${c.k.plan - c.k.spent} min left</span></div><div class="actions"><span class="badge">Pending for ${c.days} days</span><button class="btn sm" data-act="doneTask" data-id="${c.k.id}">Mark done</button><button class="btn sm ghost" data-act="resched" data-id="${c.k.id}">Reschedule</button></div></div>`).join('')}<p class="quiet" style="margin-top:8px">Anything carried forward for more than 3 days lands here.</p></div>` : '';
+    : `<div class="crit-item"><div><b>${esc(c.k.subj)}</b><br><span class="quiet">${esc(c.k.topic)} · ${c.k.plan - c.k.spent} min left</span></div><div class="actions"><span class="badge">Pending for ${c.days} days</span><button class="btn sm" data-act="doneTask" data-id="${esc(c.k.id)}">Mark done</button><button class="btn sm ghost" data-act="resched" data-id="${esc(c.k.id)}">Reschedule</button></div></div>`).join('')}<p class="quiet" style="margin-top:8px">Anything carried forward for more than 3 days lands here.</p></div>` : '';
   const warn = missed === 1 ? `<div class="warnbanner">${ICON.warn}<div><b>You skipped Quick Revision yesterday.</b><br><span class="quiet">Two missed days move it to the Critical Zone. Do a 15-question set today to keep the streak.</span></div><button class="btn sm" data-act="nav" data-v="rev">Practise</button></div>` : '';
 
   const taskRows = tk.length ? tk.map((k) => {
     const c = carried(k), tag = !k.done && c ? `<span class="badge amber" style="margin-left:6px">${c === 1 ? 'Carried from yesterday' : 'Carried ' + c + ' days'}</span>` : '';
     const left = k.plan - k.spent, partial = !k.done && k.spent > 0 ? ` · ${left} min left` : '';
-    return `<div class="trow"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${k.id}"${k.done ? ' checked' : ''}><span class="tick">${ICON.chk}</span><span class="t"><b>${esc(k.subj)}${tag}</b><span>${esc(k.topic)}${partial}</span></span><span class="m">${k.plan} min</span></label>${k.done ? '' : pinButton(k.id)}${k.done ? '' : `<button class="mini" data-act="partial" data-id="${k.id}" title="Log part of this task" aria-label="Log part done">Part</button>`}<button class="mini" data-act="sscTopicPractice" data-topic="${esc(k.topic)}" data-subj="${esc(k.subj)}">Practice</button><button class="mini del" data-act="delTask" data-id="${k.id}" title="Remove" aria-label="Remove task">&times;</button></div>`;
+    return `<div class="trow"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${esc(k.id)}"${k.done ? ' checked' : ''}><span class="tick">${ICON.chk}</span><span class="t"><b>${esc(k.subj)}${tag}</b><span>${esc(k.topic)}${partial}</span></span><span class="m">${esc(k.plan)} min</span></label>${k.done ? '' : pinButton(k.id)}${k.done ? '' : `<button class="mini" data-act="partial" data-id="${esc(k.id)}" title="Log part of this task" aria-label="Log part done">Part</button>`}<button class="mini" data-act="sscTopicPractice" data-topic="${esc(k.topic)}" data-subj="${esc(k.subj)}">Practice</button><button class="mini del" data-act="delTask" data-id="${esc(k.id)}" title="Remove" aria-label="Remove task">&times;</button></div>`;
   }).join('') : `<div class="empty"><b>Nothing planned for today</b>Add a task, or upload your 200-day plan so each day fills in by itself.<div class="actions" style="justify-content:center;margin-top:10px"><button class="btn sm" data-act="addTask">Add task</button><button class="btn sm ghost" data-act="nav" data-v="plan">Upload plan</button></div></div>`;
 
   const cT = cTotal(t);
@@ -569,7 +584,7 @@ const tTotal = () => (T.mode === 'focus' ? S.settings.pomo : S.settings.brk) * 6
 function tReset(mode) { clearInterval(T.iv); T.running = false; T.mode = mode || 'focus'; T.total = tTotal(); T.left = T.total; T.elapsed = 0; }
 function tTick() {
   const now = Date.now(), dt = Math.round((now - T.last) / 1000);
-  if (dt >= 1) { T.last += dt * 1000; T.left = Math.max(0, T.left - dt); if (T.mode === 'focus') T.elapsed += dt; }
+  if (dt >= 1) { const used = Math.min(dt, T.left); T.last += dt * 1000; T.left -= used; if (T.mode === 'focus') T.elapsed += used; }
   tPaint();
   if (T.left <= 0) {
     clearInterval(T.iv); T.running = false; beep(); notify(T.mode === 'focus' ? 'Focus session finished. Take a break.' : 'Break over. Back to study.');
@@ -605,7 +620,7 @@ VIEWS.study = function () {
   <div class="sel"><div><label class="label" for="tsubj">Subject</label><select class="inp" id="tsubj" data-chg="tField" data-f="subj">${SUBJECTS.map((s) => `<option${s === T.subj ? ' selected' : ''}>${s}</option>`).join('')}</select></div><div><label class="label" for="ttopic">Topic</label><input class="inp" id="ttopic" data-chg="tField" data-f="topic" value="${esc(T.topic)}" placeholder="What are you studying?"></div></div>
   <div class="actions"><button class="btn" data-act="tToggle">${T.running ? 'Pause' : 'Start'}</button><button class="btn ghost" data-act="tSave">Stop and save</button><button class="btn ghost" data-act="tResetBtn">Reset</button></div>
   <p class="quiet">Focus ${S.settings.pomo} min, break ${S.settings.brk} min. Change these in Settings.</p></div>`)}
-  ${card("Today's sessions", `<div class="list">${logs.map((l) => `<div class="li"><div class="l"><b>${esc(l.subj)}</b> · ${esc(l.topic)}<small>${l.min} min${l.focus ? ' · focus ' + l.focus + '/5' : ''}</small></div><button class="mini del" data-act="delLog" data-id="${l.id}" aria-label="Delete session">&times;</button></div>`).join('') || '<div class="empty"><b>No sessions yet</b>Start the timer or add one by hand.</div>'}</div><div class="actions" style="margin-top:12px"><button class="btn sm ghost" data-act="addStudy">Add session by hand</button></div><p style="margin-top:12px"><b class="mono">${hrs(sum(logs, (l) => l.min))} h</b> <span class="quiet">studied today</span></p>`)}
+  ${card("Today's sessions", `<div class="list">${logs.map((l) => `<div class="li"><div class="l"><b>${esc(l.subj)}</b> · ${esc(l.topic)}<small>${esc(l.min)} min${l.focus ? ' · focus ' + l.focus + '/5' : ''}</small></div><button class="mini del" data-act="delLog" data-id="${esc(l.id)}" aria-label="Delete session">&times;</button></div>`).join('') || '<div class="empty"><b>No sessions yet</b>Start the timer or add one by hand.</div>'}</div><div class="actions" style="margin-top:12px"><button class="btn sm ghost" data-act="addStudy">Add session by hand</button></div><p style="margin-top:12px"><b class="mono">${hrs(sum(logs, (l) => l.min))} h</b> <span class="quiet">studied today</span></p>`)}
   </div>`;
 };
 AFTER.study = () => { tPaint(); if (T.running && !T.iv) { T.last = Date.now(); T.iv = setInterval(tTick, 500); } };
@@ -759,7 +774,7 @@ VIEWS.rev = function () {
   return `${card("Today's checklist", `<div class="chips" id="rcheck" style="margin:0">${checklistHTML()}</div>${qrMissed() >= 1 ? `<p class="quiet" style="margin-top:10px">Missed days in a row before today: <b>${qrMissed()}</b></p>` : ''}`)}
   <div class="rgrid" style="margin-top:14px">${KINDS.map((o) => `<button class="rcard" data-act="revKind" data-v="${o.k}" aria-pressed="${RV.kind === o.k}"><span class="big">${o.big}</span><b>${o.name}</b><span class="quiet">${o.range} · 15 questions</span></button>`).join('')}<button class="rcard" data-act="nav" data-v="tricks"><span class="big">&times;</span><b>Maths tricks</b><span class="quiet">Diagrams, model questions and SSC methods</span></button></div>
   <div class="card" id="rpanel" style="margin-top:14px"${RV.kind ? '' : ' hidden'}>${revPanel()}</div>
-  ${card('Mistakes notebook', mist.length ? `<div class="list">${mist.map((m) => `<div class="li"><div class="l"><b class="mono">${esc(m.q.replace(' = ?', ''))} = ${esc(m.a.replace(/^(Yes|No), /, ''))}</b><small>${fmtD(m.date)}</small></div><button class="mini del" data-act="delMist" data-id="${m.id}" aria-label="Remove">&times;</button></div>`).join('')}</div>` : '<p class="quiet">Wrong answers are saved here so you can revise them.</p>', ' style="margin-top:14px"')}`;
+  ${card('Mistakes notebook', mist.length ? `<div class="list">${mist.map((m) => `<div class="li"><div class="l"><b class="mono">${esc(m.q.replace(' = ?', ''))} = ${esc(m.a.replace(/^(Yes|No), /, ''))}</b><small>${fmtD(m.date)}</small></div><button class="mini del" data-act="delMist" data-id="${esc(m.id)}" aria-label="Remove">&times;</button></div>`).join('')}</div>` : '<p class="quiet">Wrong answers are saved here so you can revise them.</p>', ' style="margin-top:14px"')}`;
 };
 AFTER.rev = () => { if (RV.kind && RV.mode === 'practice' && QZ.qz) quizDraw('qz'); if (RV.kind && RV.mode === 'flash') { if (!FL || FL.kind !== RV.kind) flashNew(); flashDraw(); } };
 function flashNew() { FL = { kind: RV.kind, qs: gen(RV.kind, 15), i: 0, show: false }; }
@@ -785,7 +800,7 @@ VIEWS.revlog = function () {
   ${card('Weak topics', weak.length ? `<div class="chips" style="margin:0">${weak.map((w) => `<span class="chip"><i class="dot r"></i>${esc(w)}</span>`).join('')}</div><p class="quiet" style="margin-top:8px">Accuracy below 60% over at least 10 questions.</p>` : '<p class="quiet">No weak topics yet. Log revisions with questions and correct answers to see them here.</p>')}
   </div>
   <div class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><h3 style="margin:0">Revision log</h3><div class="actions"><select class="inp" style="width:auto" id="rf" data-chg="revFilter" aria-label="Filter by subject">${['All'].concat(SUBJECTS).map((s) => `<option${s === revFilter ? ' selected' : ''}>${s}</option>`).join('')}</select><button class="btn sm" data-act="addRev">Log revision</button></div></div>
-  ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Subject</th><th>Topic</th><th>Time</th><th>Questions</th><th>Accuracy</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td class="n">${fmtD(r.date)}</td><td>${esc(r.subj)}</td><td>${esc(r.topic)}</td><td class="n">${r.min} min</td><td class="n">${r.q}</td><td class="n">${r.q ? Math.round(r.c / r.q * 100) + '%' : '-'}</td><td><button class="mini del" data-act="delRev" data-id="${r.id}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No revisions logged</b>Log which day, which topic, how much time and how many questions.</div>'}</div>`;
+  ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Subject</th><th>Topic</th><th>Time</th><th>Questions</th><th>Accuracy</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td class="n">${fmtD(r.date)}</td><td>${esc(r.subj)}</td><td>${esc(r.topic)}</td><td class="n">${esc(r.min)} min</td><td class="n">${esc(r.q)}</td><td class="n">${r.q ? Math.round(r.c / r.q * 100) + '%' : '-'}</td><td><button class="mini del" data-act="delRev" data-id="${esc(r.id)}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No revisions logged</b>Log which day, which topic, how much time and how many questions.</div>'}</div>`;
 };
 
 /* =============== Views: Reports =============== */
@@ -885,10 +900,13 @@ function importPlan(text, skipPast) {
   for (let i = start; i < lines.length; i++) {
     const c = splitLine(lines[i]); if (c.length < 3) continue;
     const day = parseInt(c[0], 10); const date = parseDateStr(c[1]); const subj = c[2], topic = c[3] || c[2], h = parseFloat(c[4]);
-    if (!subj) continue; rows.push({ day: isNaN(day) ? ++auto : day, date, subj, topic, min: Math.round((isNaN(h) ? 1 : h) * 60) });
+    if (!subj) continue;
+    if(c[0] && (!Number.isInteger(Number(c[0])) || Number(c[0])<1) || c[1] && (!date || !validStudyDate(date)) || c[4] && (!Number.isFinite(Number(c[4])) || Number(c[4])<=0)) throw new Error('Invalid day, date or study hours at CSV row '+(i+1)+'.');
+    rows.push({ day: isNaN(day) ? ++auto : day, date, subj, topic, min: Math.round((isNaN(h) ? 1 : h) * 60) });
   }
   if (!rows.length) return 0;
   if (rows.some((r) => !r.date)) { if (!day1) day1 = today(); rows.forEach((r) => { if (!r.date) r.date = addD(day1, r.day - 1); }); S.settings.day1 = day1; }
+  validatePlanRows(rows);
   S.plan = rows.sort((a, b) => a.date.localeCompare(b.date) || a.day - b.day);
   S.planFrom = skipPast ? today() : ''; splitPlanLessons(); persist(); genPlan(); return S.plan.length;
 }
@@ -905,7 +923,7 @@ VIEWS.plan = function () {
   <label class="check" style="margin-bottom:12px"><input type="checkbox" id="pskip" checked>Skip days before today (do not create overdue tasks)</label>
   <p class="quiet">Your PDF timetable covers Days 1–190. Numbered lessons become separate tasks. Each original topic group’s estimated hour is divided between its lessons; adjust CSV hours if needed. Days 191–200 were not included in the PDF.</p><div class="actions"><button class="btn" data-act="loadTimetable">Load my timetable</button><a class="btn ghost" href="my-timetable.csv" download>Download my timetable CSV</a></div><div class="actions"><button class="btn" data-act="planPaste">Import</button><button class="btn ghost" data-act="sampleCsv">Download sample CSV</button></div><div class="err" id="perr" style="color:var(--good)"></div>`)}
   </div>
-  ${has ? card('Coming up', `<div class="tablewrap"><table><thead><tr><th>Day</th><th>Date</th><th>Subject</th><th>Topic</th><th>Hours</th></tr></thead><tbody>${next.map((r) => `<tr><td class="n">${r.day}</td><td class="n">${fmtD(r.date)}</td><td>${esc(r.subj)}</td><td>${esc(r.topic)}</td><td class="n">${(r.min / 60).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`, ' style="margin-top:14px"') : ''}`;
+  ${has ? card('Coming up', `<div class="tablewrap"><table><thead><tr><th>Day</th><th>Date</th><th>Subject</th><th>Topic</th><th>Hours</th></tr></thead><tbody>${next.map((r) => `<tr><td class="n">${esc(r.day)}</td><td class="n">${fmtD(r.date)}</td><td>${esc(r.subj)}</td><td>${esc(r.topic)}</td><td class="n">${(r.min / 60).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`, ' style="margin-top:14px"') : ''}`;
 };
 
 /* =============== Views: Tricks =============== */
@@ -968,9 +986,9 @@ VIEWS.money = function () {
   const meets = S.meet.filter((m) => m.date >= addD(t, -1)).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
   return `<div class="grid g2">
   ${card('This month', `<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Spent</span><span class="mono">${inr(tot)}${bud ? ' / ' + inr(bud) : ''}</span></div>${bud ? `<div class="bar ${tot > bud ? 'bad' : ''}"><i style="width:${Math.min(100, Math.round(tot / bud * 100))}%"></i></div>${tot > bud ? '<p style="color:var(--bad);margin-top:8px;font-weight:600">Over budget by ' + inr(tot - bud) + '</p>' : ''}` : '<p class="quiet">Set a monthly budget in Settings.</p>'}<div style="margin-top:16px">${Object.keys(cat).length ? donutSVG(Object.entries(cat).sort((a, b) => b[1] - a[1])) : '<p class="quiet">No expenses this month.</p>'}</div><div class="actions" style="margin-top:14px"><button class="btn sm" data-act="addExp">Add expense</button></div>`)}
-  ${card('Meetings', `<div class="list">${meets.map((m) => `<div class="li"><div class="l"><b>${esc(m.title)}</b>${m.who ? ' with ' + esc(m.who) : ''}<small>${fmtD(m.date)} ${esc(m.time || '')}${m.notes ? ' · ' + esc(m.notes) : ''}</small></div><div class="actions"><button class="mini" data-act="toggleMeet" data-id="${m.id}" aria-label="Toggle done">${m.done ? 'Done' : 'Mark'}</button><button class="mini del" data-act="delMeet" data-id="${m.id}" aria-label="Delete">&times;</button></div></div>`).join('') || '<div class="empty"><b>No meetings</b>Add your mentor sessions and doubt classes.</div>'}</div><div class="actions" style="margin-top:14px"><button class="btn sm" data-act="addMeet">Add meeting</button></div>`)}
+  ${card('Meetings', `<div class="list">${meets.map((m) => `<div class="li"><div class="l"><b>${esc(m.title)}</b>${m.who ? ' with ' + esc(m.who) : ''}<small>${fmtD(m.date)} ${esc(m.time || '')}${m.notes ? ' · ' + esc(m.notes) : ''}</small></div><div class="actions"><button class="mini" data-act="toggleMeet" data-id="${esc(m.id)}" aria-label="Toggle done">${m.done ? 'Done' : 'Mark'}</button><button class="mini del" data-act="delMeet" data-id="${esc(m.id)}" aria-label="Delete">&times;</button></div></div>`).join('') || '<div class="empty"><b>No meetings</b>Add your mentor sessions and doubt classes.</div>'}</div><div class="actions" style="margin-top:14px"><button class="btn sm" data-act="addMeet">Add meeting</button></div>`)}
   </div>
-  <div class="card" style="margin-top:14px"><h3>Expenses this month</h3>${mo.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Category</th><th>Note</th><th>Mode</th><th>Amount</th><th></th></tr></thead><tbody>${mo.map((e) => `<tr><td class="n">${fmtD(e.date)}</td><td>${esc(e.cat)}</td><td>${esc(e.note || '')}</td><td>${esc(e.mode || '')}</td><td class="n">${inr(e.amt)}</td><td><button class="mini del" data-act="delExp" data-id="${e.id}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No expenses yet</b></div>'}</div>`;
+  <div class="card" style="margin-top:14px"><h3>Expenses this month</h3>${mo.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Category</th><th>Note</th><th>Mode</th><th>Amount</th><th></th></tr></thead><tbody>${mo.map((e) => `<tr><td class="n">${fmtD(e.date)}</td><td>${esc(e.cat)}</td><td>${esc(e.note || '')}</td><td>${esc(e.mode || '')}</td><td class="n">${inr(e.amt)}</td><td><button class="mini del" data-act="delExp" data-id="${esc(e.id)}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No expenses yet</b></div>'}</div>`;
 };
 
 /* =============== Views: Mock tests =============== */
@@ -978,7 +996,7 @@ VIEWS.mocks = function () {
   const ms = S.mocks.slice().sort((a, b) => a.date.localeCompare(b.date)), pct = ms.map((m) => Math.round(m.score / m.max * 100));
   const chart = ms.length > 1 ? lineSVG(pct, ms.map((m, i) => (i % Math.ceil(ms.length / 6) === 0 || i === ms.length - 1 ? fmtD(m.date) : '')), { max: 100, step: 25, trend: true, aria: 'Mock test score percentage' }) : '<p class="quiet">Log at least two mock tests to see the trend.</p>';
   return `${card('CGL section analysis', '<p class="quiet">Track negative marks, skipped questions, section accuracy and weak topics.</p><button class="btn sm" data-act="nav" data-v="mockAnalysis">Open CGL Mock Analysis</button>')}${card('Score trend (percent)', chart + (ms.length ? `<p class="quiet" style="margin-top:8px">Best ${Math.max(...pct)}% · Latest ${pct[pct.length - 1]}% · Average ${Math.round(sum(pct) / pct.length)}%</p>` : ''))}
-  <div class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Mock test log</h3><button class="btn sm" data-act="addMock">Log mock test</button></div>${ms.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Test</th><th>Score</th><th>Percent</th><th>Time</th><th>Notes</th><th></th></tr></thead><tbody>${ms.slice().reverse().map((m) => `<tr><td class="n">${fmtD(m.date)}</td><td>${esc(m.name)}</td><td class="n">${m.score} / ${m.max}</td><td class="n">${Math.round(m.score / m.max * 100)}%</td><td class="n">${m.mins ? m.mins + ' min' : '-'}</td><td>${esc(m.notes || '')}</td><td><button class="mini del" data-act="delMock" data-id="${m.id}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No mock tests yet</b>Write what went wrong in the notes column. It becomes your revision list.</div>'}</div>`;
+  <div class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Mock test log</h3><button class="btn sm" data-act="addMock">Log mock test</button></div>${ms.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Test</th><th>Score</th><th>Percent</th><th>Time</th><th>Notes</th><th></th></tr></thead><tbody>${ms.slice().reverse().map((m) => `<tr><td class="n">${fmtD(m.date)}</td><td>${esc(m.name)}</td><td class="n">${esc(m.score)} / ${esc(m.max)}</td><td class="n">${Math.round(m.score / m.max * 100)}%</td><td class="n">${m.mins ? m.mins + ' min' : '-'}</td><td>${esc(m.notes || '')}</td><td><button class="mini del" data-act="delMock" data-id="${esc(m.id)}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No mock tests yet</b>Write what went wrong in the notes column. It becomes your revision list.</div>'}</div>`;
 };
 
 /* =============== Views: Notes, formulas, words =============== */
@@ -991,7 +1009,7 @@ const WORDS = [
 VIEWS.notes = function () {
   const off = parseD(today()).getDate() % 2 * 10, words = WORDS.slice(off, off + 10);
   return `<div class="grid g2">
-  ${card('Notes (current affairs and quick points)', `<div class="actions" style="margin-bottom:12px"><button class="btn sm" data-act="addNote">Add note</button></div><div class="list">${S.notes.slice().reverse().slice(0, 30).map((n) => `<div class="li"><div class="l"><b>${esc(n.tag || 'Note')}</b> <span class="quiet">${fmtD(n.date)}</span><div>${esc(n.text)}</div></div><button class="mini del" data-act="delNote" data-id="${n.id}" aria-label="Delete">&times;</button></div>`).join('') || '<div class="empty"><b>No notes yet</b>Add today\'s current affairs or a point you keep forgetting.</div>'}</div>`)}
+  ${card('Notes (current affairs and quick points)', `<div class="actions" style="margin-bottom:12px"><button class="btn sm" data-act="addNote">Add note</button></div><div class="list">${S.notes.slice().reverse().slice(0, 30).map((n) => `<div class="li"><div class="l"><b>${esc(n.tag || 'Note')}</b> <span class="quiet">${fmtD(n.date)}</span><div>${esc(n.text)}</div></div><button class="mini del" data-act="delNote" data-id="${esc(n.id)}" aria-label="Delete">&times;</button></div>`).join('') || '<div class="empty"><b>No notes yet</b>Add today\'s current affairs or a point you keep forgetting.</div>'}</div>`)}
   ${card('Ten words today', `<div class="list">${words.map((w) => `<div class="li"><div class="l"><b>${w[0]}</b><small>${w[1]}</small></div></div>`).join('')}</div>`)}
   </div>
 `;
@@ -1054,7 +1072,7 @@ function fmtDT(s) { const d = new Date(s); if (isNaN(d)) return ''; let h = d.ge
 function remBanner() {
   const due = S.todos.filter((x) => !x.done && x.fired && !x.ack);
   if (!due.length) return '';
-  return `<div class="grid" style="gap:10px;margin-bottom:14px">${due.map((x) => `<div class="warnbanner">${ICON.warn}<div style="flex:1;min-width:0"><b>Reminder: ${esc(x.title)}</b><br><span class="quiet">${fmtDT(x.remind)}${x.due ? ' · ' + gapText(x).txt : ''}</span></div><div class="actions"><button class="btn sm" data-act="doneTodo" data-id="${x.id}">Done</button><button class="btn sm ghost" data-act="snoozeTodo" data-id="${x.id}">Snooze 1 h</button><button class="btn sm ghost" data-act="ackTodo" data-id="${x.id}">Dismiss</button></div></div>`).join('')}</div>`;
+  return `<div class="grid" style="gap:10px;margin-bottom:14px">${due.map((x) => `<div class="warnbanner">${ICON.warn}<div style="flex:1;min-width:0"><b>Reminder: ${esc(x.title)}</b><br><span class="quiet">${fmtDT(x.remind)}${x.due ? ' · ' + gapText(x).txt : ''}</span></div><div class="actions"><button class="btn sm" data-act="doneTodo" data-id="${esc(x.id)}">Done</button><button class="btn sm ghost" data-act="snoozeTodo" data-id="${esc(x.id)}">Snooze 1 h</button><button class="btn sm ghost" data-act="ackTodo" data-id="${esc(x.id)}">Dismiss</button></div></div>`).join('')}</div>`;
 }
 function todoCompact() {
   const open = S.todos.filter((x) => !x.done).sort(todoSort).slice(0, 3);
@@ -1068,9 +1086,9 @@ VIEWS.todo = function () {
   let list = TF === 'open' ? open.slice().sort(todoSort) : TF === 'done' ? done.slice().sort((a, b) => (b.doneDate || '').localeCompare(a.doneDate || '')) : S.todos.slice().sort((a, b) => (a.done - b.done) || todoSort(a, b));
   const cards = list.map((x) => {
     const g = gapText(x), over = !x.done && x.due && x.due < t;
-    return `<div class="tcard${over ? ' over' : ''}${x.done ? ' done' : ''}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><h4>${esc(x.title)}</h4>${x.pri !== 'Normal' ? `<span class="badge ${x.pri === 'High' ? 'red' : ''}">${x.pri}</span>` : ''}</div>${x.note ? `<div class="pre quiet">${esc(x.note)}</div>` : ''}
+    return `<div class="tcard${over ? ' over' : ''}${x.done ? ' done' : ''}"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><h4>${esc(x.title)}</h4>${x.pri !== 'Normal' ? `<span class="badge ${x.pri === 'High' ? 'red' : ''}">${esc(x.pri)}</span>` : ''}</div>${x.note ? `<div class="pre quiet">${esc(x.note)}</div>` : ''}
     <div class="chips" style="margin:0"><span class="badge ${g.cls}" style="padding:4px 10px">${g.txt}</span><span class="chip" style="padding:3px 10px">${x.done ? 'Added ' + fmtD(x.created) : ageText(x)}</span>${x.remind ? `<span class="chip" style="padding:3px 10px">${x.fired && !x.done ? 'Rang ' : 'Reminder '}${fmtDT(x.remind)}</span>` : ''}</div>
-    <div class="actions" style="margin-top:auto"><button class="btn sm${x.done ? ' ghost' : ''}" data-act="doneTodo" data-id="${x.id}">${x.done ? 'Undo' : 'Done'}</button>${x.remind && !x.done ? `<button class="mini" data-act="snoozeTodo" data-id="${x.id}">+1 h</button>` : ''}<button class="mini" data-act="editTodo" data-id="${x.id}">Edit</button><button class="mini del" data-act="delTodo" data-id="${x.id}" aria-label="Delete">&times;</button></div></div>`;
+    <div class="actions" style="margin-top:auto"><button class="btn sm${x.done ? ' ghost' : ''}" data-act="doneTodo" data-id="${esc(x.id)}">${x.done ? 'Undo' : 'Done'}</button>${x.remind && !x.done ? `<button class="mini" data-act="snoozeTodo" data-id="${esc(x.id)}">+1 h</button>` : ''}<button class="mini" data-act="editTodo" data-id="${esc(x.id)}">Edit</button><button class="mini del" data-act="delTodo" data-id="${esc(x.id)}" aria-label="Delete">&times;</button></div></div>`;
   }).join('');
   return `${remBanner()}<div class="stats" style="margin-bottom:14px"><div class="stat"><span class="label">Open</span><b>${open.length}</b><small>${dueT.length} due today</small></div><div class="stat"><span class="label">Overdue</span><b style="color:${over.length ? 'var(--bad)' : 'inherit'}">${over.length}</b><small>${over.length ? 'longest ' + Math.max(...over.map((x) => diff(x.due, t))) + ' days late' : 'none late'}</small></div><div class="stat"><span class="label">Waiting longest</span><b>${oldest} d</b><small>oldest open card</small></div><div class="stat"><span class="label">Average to finish</span><b>${avg == null ? '-' : avg.toFixed(1) + ' d'}</b><small>${done.length} finished</small></div></div>
   <div class="actions" style="margin-bottom:14px"><div class="seg">${[['open', 'Open'], ['done', 'Done'], ['all', 'All']].map((f) => `<button data-act="tFilter" data-v="${f[0]}" aria-pressed="${TF === f[0]}">${f[1]}</button>`).join('')}</div><button class="btn sm" data-act="addTodo">Add to-do</button></div>
@@ -1091,16 +1109,16 @@ VIEWS.learn = function () {
   const books = S.books.map((b) => {
     const read = bookRead(b), pct = Math.round(read / b.total * 100), last7 = sum((b.log || []).filter((x) => x.date > addD(t, -7)), (x) => x.pages), pace = last7 / 7, lastLog = (b.log || []).slice().sort((x, y) => y.date.localeCompare(x.date))[0];
     return `<div class="bkc"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><h4>${esc(b.title)}</h4><span class="quiet">${esc(b.author || 'Author not set')}</span></div><span class="badge ${read >= b.total ? 'green' : 'amber'}">${read >= b.total ? 'Finished' : pct + '%'}</span></div>
-    <div class="bar"><i style="width:${pct}%"></i></div><div class="mono" style="font-size:13px">${read} / ${b.total} pages${pace > 0 && read < b.total ? ` <span class="quiet">· about ${Math.ceil((b.total - read) / pace)} days left at ${pace.toFixed(1)} pages a day</span>` : ''}</div>
-    ${lastLog ? `<span class="quiet">Last: ${lastLog.pages} pages on ${fmtD(lastLog.date)}</span>` : '<span class="quiet">No pages logged yet</span>'}
-    <div class="actions" style="margin-top:auto"><button class="btn sm" data-act="logBook" data-id="${b.id}">Log pages</button><button class="mini" data-act="editBook" data-id="${b.id}">Edit</button><button class="mini del" data-act="delBook" data-id="${b.id}" aria-label="Delete book">&times;</button></div></div>`;
+    <div class="bar"><i style="width:${pct}%"></i></div><div class="mono" style="font-size:13px">${read} / ${esc(b.total)} pages${pace > 0 && read < b.total ? ` <span class="quiet">· about ${Math.ceil((b.total - read) / pace)} days left at ${pace.toFixed(1)} pages a day</span>` : ''}</div>
+    ${lastLog ? `<span class="quiet">Last: ${esc(lastLog.pages)} pages on ${fmtD(lastLog.date)}</span>` : '<span class="quiet">No pages logged yet</span>'}
+    <div class="actions" style="margin-top:auto"><button class="btn sm" data-act="logBook" data-id="${esc(b.id)}">Log pages</button><button class="mini" data-act="editBook" data-id="${esc(b.id)}">Edit</button><button class="mini del" data-act="delBook" data-id="${esc(b.id)}" aria-label="Delete book">&times;</button></div></div>`;
   }).join('');
   return `<div class="stats" style="margin-bottom:14px"><div class="stat"><span class="label">Pages today</span><b>${pagesOn(t)}</b><small>${wk} this week</small></div><div class="stat"><span class="label">Books</span><b>${S.books.length}</b><small>${reading} in progress</small></div><div class="stat"><span class="label">Learning cards</span><b>${S.learn.length}</b><small>${S.learn.filter((c) => c.date === t).length} added today</small></div><div class="stat"><span class="label">Pages total</span><b>${sum(S.books, bookRead)}</b><small>across all books</small></div></div>
   <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap"><h3 style="margin:0">Books</h3><button class="btn sm" data-act="addBook">Add book</button></div>${books ? `<div class="kgrid">${books}</div>` : '<div class="empty"><b>No books yet</b>Add a book with its total pages, then log the pages you cover each day.</div>'}</div>
   <div class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap"><h3 style="margin:0">What I learned</h3><button class="btn sm" data-act="addLearn">New learning card</button></div>
     <input class="inp srch" id="lq" placeholder="Search your cards" value="${esc(LQ.learn)}" data-inp="search" data-k="learn" aria-label="Search learning cards">
     ${tags.length > 2 ? `<div class="chips">${tags.map((g) => `<button class="chip" data-act="lTag" data-v="${esc(g)}" aria-pressed="${LQ.tag === g}" style="${LQ.tag === g ? 'background:var(--teal);color:var(--teal-ink);border-color:var(--teal)' : ''}">${esc(g)}</button>`).join('')}</div>` : ''}
-    ${cards.length ? `<div class="kgrid">${cards.map((c) => { const bk = S.books.find((b) => b.id === c.book); return `<div class="kcard"><h4>${esc(c.title)}</h4><div class="pre">${esc(c.text)}</div><div class="chips" style="margin:0">${c.tag ? `<span class="chip" style="padding:3px 10px">${esc(c.tag)}</span>` : ''}${bk ? `<span class="chip" style="padding:3px 10px">${esc(bk.title)}</span>` : ''}<span class="quiet" style="font-size:12px;align-self:center">${fmtD(c.date)}</span></div><div class="actions" style="margin-top:auto"><button class="mini" data-act="editLearn" data-id="${c.id}">Edit</button><button class="mini del" data-act="delLearn" data-id="${c.id}" aria-label="Delete card">&times;</button></div></div>`; }).join('')}</div>` : '<div class="empty"><b>No cards yet</b>Type what you learned today, a rule, a fact or a word. Link it to a book if you like.</div>'}</div>`;
+    ${cards.length ? `<div class="kgrid">${cards.map((c) => { const bk = S.books.find((b) => b.id === c.book); return `<div class="kcard"><h4>${esc(c.title)}</h4><div class="pre">${esc(c.text)}</div><div class="chips" style="margin:0">${c.tag ? `<span class="chip" style="padding:3px 10px">${esc(c.tag)}</span>` : ''}${bk ? `<span class="chip" style="padding:3px 10px">${esc(bk.title)}</span>` : ''}<span class="quiet" style="font-size:12px;align-self:center">${fmtD(c.date)}</span></div><div class="actions" style="margin-top:auto"><button class="mini" data-act="editLearn" data-id="${esc(c.id)}">Edit</button><button class="mini del" data-act="delLearn" data-id="${esc(c.id)}" aria-label="Delete card">&times;</button></div></div>`; }).join('')}</div>` : '<div class="empty"><b>No cards yet</b>Type what you learned today, a rule, a fact or a word. Link it to a book if you like.</div>'}</div>`;
 };
 
 /* =============== Views: Diary =============== */
@@ -1111,7 +1129,7 @@ VIEWS.diary = function () {
   if (LQ.dfilter === 'star') es = es.filter((e) => e.star);
   if (q) es = es.filter((e) => ((e.title || '') + ' ' + e.text).toLowerCase().includes(q));
   const groups = {}, order = []; es.forEach((e) => { const k = e.date.slice(0, 7); if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(e); });
-  const body = order.map((k) => { const ym = k.split('-').map(Number); return `<h3 style="margin:18px 0 10px">${MON[ym[1] - 1]} ${ym[0]}</h3><div class="kgrid">${groups[k].map((e) => `<div class="dcard"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="label">${WD[parseD(e.date).getDay()]}, ${fmtD(e.date)}</span><div class="actions" style="gap:6px"><button class="mini" data-act="starDiary" data-id="${e.id}" aria-pressed="${!!e.star}" aria-label="Mark important" title="Important" style="${e.star ? 'color:var(--accent);border-color:var(--accent)' : ''}">${e.star ? '&#9733;' : '&#9734;'}</button></div></div>${e.title ? `<h4>${esc(e.title)}</h4>` : ''}<div class="pre">${esc(e.text)}</div><div class="chips" style="margin:0">${e.mood ? `<span class="chip" style="padding:3px 10px">${esc(e.mood)}</span>` : ''}${e.star ? '<span class="badge amber">Important</span>' : ''}</div><div class="actions" style="margin-top:auto"><button class="mini" data-act="editDiary" data-id="${e.id}">Edit</button><button class="mini del" data-act="delDiary" data-id="${e.id}" aria-label="Delete entry">&times;</button></div></div>`).join('')}</div>`; }).join('');
+  const body = order.map((k) => { const ym = k.split('-').map(Number); return `<h3 style="margin:18px 0 10px">${MON[ym[1] - 1]} ${ym[0]}</h3><div class="kgrid">${groups[k].map((e) => `<div class="dcard"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="label">${WD[parseD(e.date).getDay()]}, ${fmtD(e.date)}</span><div class="actions" style="gap:6px"><button class="mini" data-act="starDiary" data-id="${esc(e.id)}" aria-pressed="${!!e.star}" aria-label="Mark important" title="Important" style="${e.star ? 'color:var(--accent);border-color:var(--accent)' : ''}">${e.star ? '&#9733;' : '&#9734;'}</button></div></div>${e.title ? `<h4>${esc(e.title)}</h4>` : ''}<div class="pre">${esc(e.text)}</div><div class="chips" style="margin:0">${e.mood ? `<span class="chip" style="padding:3px 10px">${esc(e.mood)}</span>` : ''}${e.star ? '<span class="badge amber">Important</span>' : ''}</div><div class="actions" style="margin-top:auto"><button class="mini" data-act="editDiary" data-id="${esc(e.id)}">Edit</button><button class="mini del" data-act="delDiary" data-id="${esc(e.id)}" aria-label="Delete entry">&times;</button></div></div>`).join('')}</div>`; }).join('');
   return `<div class="card"><div class="actions" style="margin-bottom:12px"><button class="btn" data-act="addDiary">Write an entry</button><div class="seg">${[['all', 'All'], ['star', 'Important']].map((f) => `<button data-act="dFilter" data-v="${f[0]}" aria-pressed="${LQ.dfilter === f[0]}">${f[1]}</button>`).join('')}</div></div>
   <input class="inp" id="dq" placeholder="Search your diary" value="${esc(LQ.diary)}" data-inp="search" data-k="diary" aria-label="Search diary"></div>
   ${body || '<div class="empty" style="margin-top:14px"><b>Your diary is empty</b>Write about your day, a decision, or something you want to remember. Star the important ones.</div>'}
@@ -1274,11 +1292,11 @@ const ACT = {
   },
   planPaste: () => {
     const f = $('#pfile'), txt = $('#ptext').value; S.settings.day1 = $('#pday1').value || today();
-    const go = (text) => { const n = importPlan(text, $('#pskip').checked); if (!n) { $('#perr').style.color = 'var(--bad)'; $('#perr').textContent = 'Could not read any rows. Each line needs at least Day, Date, Subject.'; return; } toast(n + ' plan lines imported'); render(); };
+    const go = (text) => { let n; try { n=importPlan(text, $('#pskip').checked); } catch(error) { $('#perr').style.color='var(--bad)'; $('#perr').textContent=error.message; return; } if (!n) { $('#perr').style.color = 'var(--bad)'; $('#perr').textContent = 'Could not read any rows. Each line needs at least Day, Date, Subject.'; return; } toast(n + ' plan lines imported'); render(); };
     if (txt.trim()) go(txt); else if (f && f.files && f.files[0]) { const r = new FileReader(); r.onload = () => go(String(r.result)); r.readAsText(f.files[0]); } else { $('#perr').style.color = 'var(--bad)'; $('#perr').textContent = 'Choose a CSV file or paste your plan first.'; }
   },
   sampleCsv: () => { const t = today(), rows = ['Day,Date,Subject,Topic,Planned Hours,Notes']; const T2 = [['Quant', 'Percentage basics', 2], ['Reasoning', 'Syllogism', 1.5], ['English', 'Error spotting', 1], ['General Studies', 'Polity: Preamble', 1], ['Quant', 'Profit and loss', 2], ['Reasoning', 'Blood relations', 1.5], ['English', 'Cloze test', 1]]; T2.forEach((r, i) => rows.push((i + 1) + ',' + addD(t, i) + ',' + r[0] + ',' + r[1] + ',' + r[2] + ',')); download('ssc-plan-sample.csv', rows.join('\n'), 'text/csv'); },
-  skipToday: () => { const t = today(); S.plan.forEach((r) => { if (r.date >= t) r.date = addD(r.date, 1); }); persist(); toast('Plan pushed by one day'); render(); },
+  skipToday: () => { postponePlan(S,today()); persist(); toast('Plan pushed by one day'); render(); },
   clearPlan: () => { S.plan = []; S.tasks = S.tasks.filter((k) => !(k.pk && !k.done && k.spent === 0)); persist(); render(); },
   runTrick: () => runTrick(),
   trickQuiz: (d) => { const kind = 't' + d.v; $('#tq' + d.v).innerHTML = '<div id="tqz' + d.v + '"></div>'; const box = 'tqz' + d.v; quizStart(box, kind, 5, {onDone: Z => recordMentalSession(Z,'Maths Tricks level '+d.v)}); },
@@ -1340,12 +1358,12 @@ const CHG = {
   tField: (el) => { T[el.dataset.f] = el.value; },
   mcq: (el) => { RV.mcq = el.checked; if (QZ.qz) QZ.qz.mcq = el.checked; },
   revFilter: (el) => { revFilter = el.value; render(); },
-  setting: (el) => { const k = el.dataset.key; S.settings[k] = el.type === 'number' ? (parseFloat(el.value) || 0) : el.value; if (k === 'pomo' || k === 'brk') tReset('focus'); persist(); toast('Saved'); },
+  setting: (el) => { const k = el.dataset.key; if(el.type === 'number' && (!Number.isFinite(Number(el.value)) || el.value.trim()==='' || el.min!=='' && Number(el.value)<Number(el.min))) { el.value=S.settings[k]; toast('Enter a valid value within the allowed range.'); return; } S.settings[k] = el.type === 'number' ? Number(el.value) : el.value; if (k === 'pomo' || k === 'brk') tReset('focus'); persist(); toast('Saved'); },
   nameSet: (el) => { S.name = el.value.trim(); persist(); toast('Saved'); },
   planFile: () => { /* read on Import */ },
   importData: (el) => {
     const f = el.files && el.files[0]; if (!f) return; const r = new FileReader();
-    r.onload = () => { try { const o = JSON.parse(String(r.result)); if (!o || typeof o !== 'object' || !Array.isArray(o.logs)) throw new Error('bad'); S = Object.assign(blank(), o); S.settings = Object.assign(blank().settings, o.settings || {}); persist(); toast('Backup restored'); show('home'); } catch (e) { toast('That file is not a valid backup'); } };
+    r.onload = () => { try { const o = validateBackup(JSON.parse(String(r.result))); S = Object.assign(blank(), o); S.settings = cleanSettings(o.settings); rollover(); genPlan(); persist(); toast('Backup restored'); show('home'); } catch (e) { toast('That file is not a valid backup'); } };
     r.readAsText(f);
   }
 };
@@ -1460,7 +1478,7 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('change', (e) => { const el = e.target.closest('[data-chg]'); if (el && CHG[el.dataset.chg]) CHG[el.dataset.chg](el); });
 VIEWS.more = function () {
-  return `<div class="menu">${NAV.filter((n) => !n.prim).map((n) => `<button data-act="nav" data-v="${n.id}">${ICON[n.id]}${esc(n.label)}</button>`).join('')}</div>`;
+  return `<div class="menu">${NAV.filter((n) => !n.prim).map((n) => `<button data-act="nav" data-v="${esc(n.id)}">${ICON[n.id]}${esc(n.label)}</button>`).join('')}</div>`;
 };
 
 /* =============== Auth and boot =============== */
@@ -1507,7 +1525,7 @@ $('#lform').addEventListener('submit', async (e) => {
   }
 });
 function startSession(name, uidv) {
-  UID = uidv; KEY = uidv ? 'sst_state_' + uidv : 'sst_state_local';
+  deviceSaveProblem = ''; UID = uidv; KEY = uidv ? 'sst_state_' + uidv : 'sst_state_local';
   clearTimeout(saveT); syncState.unsubscribe?.(); syncState.generation++; syncState.saving = false; syncState.conflict = null; syncState.problem = '';
   loadLocal(); syncState.legacyCandidate = clone(S); ssc.resetSession(); ssc.ensure();
   try { syncState.base = JSON.parse(lsGet(KEY + '_server') || 'null'); } catch { syncState.base = null; }

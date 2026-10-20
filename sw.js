@@ -1,7 +1,7 @@
 /* Service worker: makes the app open instantly and work offline.
    IMPORTANT: whenever you change any app file, increase the number in CACHE
    (for example study-tracker-v2) so phones and PCs pick up the new files. */
-const CACHE = 'study-tracker-v19';
+const CACHE = 'study-tracker-v20';
 const FILES = [
   './', './index.html', './styles.css', './app.js', './cloud.js',
   './firebase-config.js', './manifest.json', './my-timetable.csv',
@@ -16,7 +16,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('study-tracker-') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

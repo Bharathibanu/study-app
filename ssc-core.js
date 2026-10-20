@@ -204,3 +204,53 @@ export function backlogRecovery(state,today,nowMinute=0) {
   const scheduled=days.reduce((n,d)=>n+d.target,0);
   return {config,days,total,scheduled,unscheduled:Math.max(0,total-scheduled),dailyMinutes:config.windows.reduce((n,w)=>n+clockMinutes(w.end)-clockMinutes(w.start),0)};
 }
+
+// Moving a plan keeps each task's identity, study credit and linked logs intact.
+export function postponePlan(state,fromDate) {
+  const moved=new Map();
+  for(const row of state.plan || [])if(row.date>=fromDate){
+    const key=[row.date,row.subj,row.topic].join('|');row.date=addDays(row.date,1);moved.set(key,row);
+  }
+  for(const task of state.tasks || []){
+    const row=moved.get(task.pk);if(!row)continue;
+    task.pk=[row.date,row.subj,row.topic].join('|');task.orig=row.date;
+    task.date=addDays(task.date,1);
+  }
+  return moved.size;
+}
+export function validateBackup(value) {
+  const fail=message=>{throw new Error('Invalid backup: '+message);};
+  if(!object(value) || !Array.isArray(value.logs))fail('expected an account object with study logs.');
+  const stack=[value];while(stack.length){const item=stack.pop();for(const [key,child] of Object.entries(item)){if(['__proto__','prototype','constructor'].includes(key))fail('unsupported object key.');if(child && typeof child==='object')stack.push(child);}}
+  if(value.name!==undefined && typeof value.name!=='string')fail('name must be text.');
+  const collections=['plan','tasks','logs','rev','exp','meet','qr','mist','mocks','notes','practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays','todos','books','learn','diary'];
+
+  for(const key of collections){
+    if(value[key]===undefined)continue;
+    if(!Array.isArray(value[key]) || value[key].some(row=>!object(row)))fail(key+' must contain records.');
+    if(!['plan','tasks','todos','books'].includes(key) && value[key].some(row=>!validStudyDate(row.date)))fail(key+' needs valid record dates.');
+    for(const row of value[key])for(const field of ['date','orig','doneDate','created','due'])if(row[field]!==undefined && row[field]!==null && row[field]!=='' && !validStudyDate(row[field]))fail(key+' has an invalid '+field+'.');
+  }
+  for(const key of ['settings','mastered','dailyFocus','canteen'])if(value[key]!==undefined && !object(value[key]))fail(key+' must be an object.');
+  for(const row of value.plan || [])if(!validStudyDate(row.date) || !Number.isInteger(row.day) || row.day<1 || !Number.isFinite(row.min) || row.min<0 || typeof row.subj!=='string' || typeof row.topic!=='string')fail('a plan lesson is malformed.');
+  for(const row of value.tasks || [])if(typeof row.id!=='string' || !validStudyDate(row.date) || !validStudyDate(row.orig) || !Number.isFinite(row.plan) || row.plan<0 || !Number.isFinite(row.spent) || row.spent<0 || typeof row.done!=='boolean' || typeof row.subj!=='string' || typeof row.topic!=='string')fail('a task is malformed.');
+  for(const row of value.logs)if(!validStudyDate(row.date) || !Number.isFinite(row.min) || row.min<0 || typeof row.subj!=='string')fail('a study log is malformed.');
+  for(const row of value.books || [])if(!Number.isFinite(row.total) || row.total<=0 || !Array.isArray(row.log) || row.log.some(r=>!object(r) || !validStudyDate(r.date) || !Number.isFinite(r.pages)))fail('a book log is malformed.');
+  for(const row of value.todos || [])if(!validStudyDate(row.created))fail('a to-do creation date is missing.');
+  for(const row of value.mist || [])if(typeof row.q!=='string' || typeof row.a!=='string')fail('a quick-revision mistake is malformed.');
+  for(const row of value.practice || [])validateAttempt(row);
+  for(const row of value.mockAnalyses || []){if(!Array.isArray(row.sections))fail('mock sections are malformed.');validateMockSections(row.sections);}
+  if(value.canteen){if(!object(value.canteen.prices) || !object(value.canteen.days) || Object.values(value.canteen.days).some(r=>!object(r) || !object(r.p)))fail('canteen data is malformed.');}
+  for(const entry of Object.values(value.dailyFocus || {}))if(!object(entry) || entry.pins!==undefined && (!Array.isArray(entry.pins) || entry.pins.some(id=>typeof id!=='string')) || entry.available!==undefined && (!Number.isFinite(entry.available) || entry.available<0))fail('daily priorities are malformed.');
+  return value;
+}
+
+export const validStudyDate=date=>{if(typeof date!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(date))return false;const d=new Date(date+'T12:00:00Z');return Number.isFinite(+d) && d.toISOString().slice(0,10)===date;};
+export function validatePlanRows(rows) {
+  const keys=new Set();
+  for(const row of rows){
+    if(!validStudyDate(row.date) || !Number.isInteger(row.day) || row.day<1 || !Number.isFinite(row.min) || row.min<=0 || typeof row.subj!=='string' || !row.subj.trim() || typeof row.topic!=='string' || !row.topic.trim())throw new Error('Each plan row needs a positive day, valid date, subject, topic and positive study minutes.');
+    const key=[row.date,row.subj,row.topic].join('|');if(keys.has(key))throw new Error('Duplicate plan lesson: '+row.topic+' on '+row.date+'.');keys.add(key);
+  }
+  return rows;
+}
