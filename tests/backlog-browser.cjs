@@ -26,7 +26,7 @@ const {chromium}=require('playwright');const assert=require('assert/strict');con
   await page.selectOption('#backlog-age','');await page.selectOption('#backlog-group','subject');assert.equal(await list.locator('.backlog-group').count(),2);
   await page.selectOption('#backlog-group','age');await page.selectOption('#backlog-age','14');assert.match(await list.textContent(),/Carried 14 days · Critical/);
   assert.equal(await list.locator('.backlog-row small').evaluate(el=>getComputedStyle(el).display),'block');
-  await list.getByRole('button',{name:'Log progress'}).click();await page.locator('#f_min').fill('30');await page.locator('#msubmit').click();assert.equal(await list.locator('.backlog-row').count(),0);
+  await list.getByRole('button',{name:'Log progress'}).click();await page.locator('#f_min').fill('60');await page.locator('#msubmit').click();assert.equal(await list.locator('.backlog-row').count(),0);
   await page.selectOption('#backlog-age','0');assert.match(await list.locator('.backlog-row').textContent(),/Due today/);
   await page.selectOption('#backlog-age','');assert.equal(await list.locator('.backlog-row').count(),14);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);

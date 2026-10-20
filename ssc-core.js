@@ -254,3 +254,20 @@ export function validatePlanRows(rows) {
   }
   return rows;
 }
+
+export const lessonMinutes = state => state.settings?.lessonMinutes===45 ? 45 : 60;
+// Retain finished history and actual study minutes; change estimates for unfinished work.
+export function setPlanLessonMinutes(state,minutes,today) {
+  if(![45,60].includes(minutes))throw new Error('Choose 45 or 60 minutes per lesson.');
+  const byKey=new Map((state.tasks || []).filter(t=>t.pk).map(t=>[t.pk,t]));let changed=false;
+  for(const row of state.plan || []){
+    const task=byKey.get([row.date,row.subj,row.topic].join('|'));
+    if(task?.done)continue;
+    if(row.min!==minutes){row.min=minutes;changed=true;}
+    if(task && task.plan!==minutes){
+      task.plan=minutes;changed=true;
+      if(task.spent>=minutes){task.done=true;task.doneDate=(state.logs || []).filter(l=>l.task===task.id && l.date).map(l=>l.date).sort().at(-1) || today;}
+    }
+  }
+  return changed;
+}

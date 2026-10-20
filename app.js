@@ -5,7 +5,7 @@ import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
-import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, backlogRecovery, recoveryConfig, validateRecovery, postponePlan, validateBackup, validStudyDate, validatePlanRows } from './ssc-core.js';
+import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, backlogRecovery, recoveryConfig, validateRecovery, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -209,6 +209,7 @@ function dataChanged() { rollover(); genPlan(); if (!$('#app').hidden && $('#mod
 
 /* =============== Data logic =============== */
 function genPlan() {
+  const durationsChanged=setPlanLessonMinutes(S,lessonMinutes(S),today());
   const t = today(), have = new Set(S.tasks.map((k) => k.pk).filter(Boolean));
   let n = 0;
   S.plan.forEach((r) => {
@@ -219,7 +220,7 @@ function genPlan() {
     S.tasks.push({ id: 'plan:' + pk, pk, orig: r.date, date: r.date, subj: r.subj, topic: r.topic, plan: r.min, spent: 0, done: false, doneDate: null });
     n++;
   });
-  if (n) persist();
+  if (n || durationsChanged) persist();
   return n;
 }
 // View preferences stay on this device; filtering never changes plan dates or progress.
@@ -400,7 +401,7 @@ function openForm(title, fields, submit, cb, opts) {
   $('#merr').textContent = '';
   $('#msubmit').textContent = submit || 'Save';
   $('#mfoot').hidden = false; $('#modal').hidden = false;
-  const first = $('#mbody input,#mbody select,#mbody textarea'); if (first && !(opts && opts.noFocus)) setTimeout(() => first.focus(), 60);
+  const first = $('#mbody input,#mbody select,#mbody textarea'); if (first && !(opts && opts.noFocus)) setTimeout(() => { if(first.isConnected && !$('#modal').hidden && !$('#modal').contains(document.activeElement))first.focus(); }, 60);
 }
 function openMenu(title, items) {
   modalCb = null; $('#mtitle').textContent = title; $('#mfoot').hidden = true; $('#merr').textContent = '';
@@ -865,7 +866,7 @@ function splitPlanLessons() {
     const parent = S.tasks.find(k => k.pk === key);
     let remaining = parent ? parent.spent : 0;
     const children = topics.map((topic, i) => {
-      const min = Math.floor(row.min / topics.length) + (i < row.min % topics.length ? 1 : 0);
+      const min = parent?.done ? Math.floor(row.min / topics.length) + (i < row.min % topics.length ? 1 : 0) : lessonMinutes(S);
       expanded.push({ ...row, topic, min });
       if (!parent) return null;
       const spent = Math.min(min, remaining); remaining -= spent;
@@ -914,14 +915,14 @@ VIEWS.plan = function () {
   const t = today(), has = S.plan.length;
   const total = has ? Math.max(...S.plan.map((r) => r.day)) : 0, cur = has ? Math.max(0, ...S.plan.filter((r) => r.date <= t).map((r) => r.day)) : 0;
   const next = S.plan.filter((r) => r.date >= t).slice(0, 14);
-  return `<div class="grid g2">
+  return `<div class="card" style="margin-bottom:14px"><h3>Time per plan topic</h3><label class="label" for="planLessonMinutes">Lesson duration</label><select class="inp" id="planLessonMinutes" data-chg="lessonDuration"><option value="60" ${lessonMinutes(S)===60?'selected':''}>60 minutes per topic</option><option value="45" ${lessonMinutes(S)===45?'selected':''}>45 minutes per topic</option></select><p class="quiet">Applies to every unfinished and future plan lesson, including each numbered lesson. Completed lessons and actual study logs keep their history. Daily planned hours, gaps and recovery suggestions update to match.</p></div><div class="grid g2">
   ${card('Your plan', has ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Progress</span><span class="mono">Day ${cur} / ${total}</span></div><div class="bar warnbar"><i style="width:${Math.round(cur / total * 100)}%"></i></div><p class="quiet" style="margin-top:10px">${S.plan.length} plan lines from ${fmtD(S.plan[0].date)} to ${fmtD(S.plan[S.plan.length - 1].date)}. Each day's lines appear in Today's schedule automatically.</p><div class="actions" style="margin-top:12px"><button class="btn sm" data-act="splitLessons">Separate numbered lessons</button><button class="btn sm ghost" data-act="skipToday">Skip today (push plan by 1 day)</button><button class="btn sm ghost" data-act="clearPlan">Remove plan</button></div>` : '<div class="empty"><b>No plan yet</b>Upload your 200-day strategy as a CSV file, or paste it on the right.</div>')}
   ${card('Upload or paste', `<p class="quiet" style="margin-bottom:10px">Columns: Day, Date, Subject, Topic, Planned Hours, Notes. Date is optional if you set Day 1 below. From Excel, use Save As CSV.</p>
   <div class="setrow"><label class="label" for="pfile">CSV file</label><input class="inp" type="file" id="pfile" accept=".csv,.txt,text/csv,text/plain" data-chg="planFile"></div>
   <div class="setrow"><label class="label" for="ptext">Or paste here</label><textarea class="inp" id="ptext" placeholder="1,2026-10-13,Quant,Percentage,2,Basics&#10;1,2026-10-13,Reasoning,Syllogism,1,"></textarea></div>
   <div class="setrow"><label class="label" for="pday1">Day 1 date (used when the file has no dates)</label><input class="inp" type="date" id="pday1" value="${esc(S.settings.day1 || t)}"></div>
   <label class="check" style="margin-bottom:12px"><input type="checkbox" id="pskip" checked>Skip days before today (do not create overdue tasks)</label>
-  <p class="quiet">Your PDF timetable covers Days 1–190. Numbered lessons become separate tasks. Each original topic group’s estimated hour is divided between its lessons; adjust CSV hours if needed. Days 191–200 were not included in the PDF.</p><div class="actions"><button class="btn" data-act="loadTimetable">Load my timetable</button><a class="btn ghost" href="my-timetable.csv" download>Download my timetable CSV</a></div><div class="actions"><button class="btn" data-act="planPaste">Import</button><button class="btn ghost" data-act="sampleCsv">Download sample CSV</button></div><div class="err" id="perr" style="color:var(--good)"></div>`)}
+  <p class="quiet">Your PDF timetable covers Days 1–190. Numbered lessons become separate tasks. Each numbered lesson gets the selected 45 or 60 minutes; group time is not divided between lessons. CSV hours are replaced by this setting for unfinished and future lessons. Days 191–200 were not included in the PDF.</p><div class="actions"><button class="btn" data-act="loadTimetable">Load my timetable</button><a class="btn ghost" href="my-timetable.csv" download>Download my timetable CSV</a></div><div class="actions"><button class="btn" data-act="planPaste">Import</button><button class="btn ghost" data-act="sampleCsv">Download sample CSV</button></div><div class="err" id="perr" style="color:var(--good)"></div>`)}
   </div>
   ${has ? card('Coming up', `<div class="tablewrap"><table><thead><tr><th>Day</th><th>Date</th><th>Subject</th><th>Topic</th><th>Hours</th></tr></thead><tbody>${next.map((r) => `<tr><td class="n">${esc(r.day)}</td><td class="n">${fmtD(r.date)}</td><td>${esc(r.subj)}</td><td>${esc(r.topic)}</td><td class="n">${(r.min / 60).toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`, ' style="margin-top:14px"') : ''}`;
 };
@@ -1237,7 +1238,7 @@ const ACT = {
   logout: () => logout(),
   closeModal: () => closeModal(),
   fab: () => openMenu('Quick add', [['addTask', 'Task for today'], ['addTodo', 'To-do card'], ['addStudy', 'Study session'], ['addLearn', 'Learning card'], ['addDiary', 'Diary entry'], ['addExp', 'Expense'], ['addMeet', 'Meeting'], ['addNote', 'Note']]),
-  addTask: () => { closeModal(); openForm('Add task', [{ k: 'subj', label: 'Subject', type: 'select', options: SUBJECTS }, { k: 'topic', label: 'Topic', req: 1, ph: 'What will you study?' }, { k: 'min', label: 'Minutes planned', type: 'number', value: 45, min: 5, req: 1 }], 'Add task', (v) => { S.tasks.push({ id: uid(), orig: today(), date: today(), subj: v.subj, topic: v.topic, plan: v.min, spent: 0, done: false, doneDate: null }); persist(); toast('Task added'); render(); }); },
+  addTask: () => { closeModal(); openForm('Add task', [{ k: 'subj', label: 'Subject', type: 'select', options: SUBJECTS }, { k: 'topic', label: 'Topic', req: 1, ph: 'What will you study?' }, { k: 'min', label: 'Minutes planned', type: 'number', value: 60, min: 5, req: 1 }], 'Add task', (v) => { S.tasks.push({ id: uid(), orig: today(), date: today(), subj: v.subj, topic: v.topic, plan: v.min, spent: 0, done: false, doneDate: null }); persist(); toast('Task added'); render(); }); },
   addStudy: () => { closeModal(); saveSession(30); },
   addExp: () => { closeModal(); openForm('Add expense', [{ k: 'amt', label: 'Amount (₹)', type: 'number', req: 1, min: 1 }, { k: 'cat', label: 'Category', type: 'select', options: CATS }, { k: 'mode', label: 'Paid by', type: 'select', options: ['UPI', 'Cash', 'Card'] }, { k: 'note', label: 'Note', ph: 'optional' }, { k: 'date', label: 'Date', type: 'date', value: today() }], 'Add expense', (v) => { S.exp.push({ id: uid(), date: v.date || today(), amt: v.amt, cat: v.cat, mode: v.mode, note: v.note }); persist(); toast('Expense added'); render(); }); },
   addMeet: () => { closeModal(); openForm('Add meeting', [{ k: 'title', label: 'Title', req: 1 }, { k: 'date', label: 'Date', type: 'date', value: today() }, { k: 'time', label: 'Time', type: 'time' }, { k: 'who', label: 'With whom' }, { k: 'notes', label: 'Notes' }], 'Add meeting', (v) => { S.meet.push({ id: uid(), date: v.date || today(), time: v.time, title: v.title, who: v.who, notes: v.notes, done: false }); persist(); toast('Meeting added'); render(); }); },
@@ -1344,6 +1345,7 @@ ACT.mathModelPractice = d => {
   }});
 };
 const CHG = {
+  lessonDuration: el => { const minutes=Number(el.value);if(![45,60].includes(minutes))return;S.settings.lessonMinutes=minutes;setPlanLessonMinutes(S,minutes,today());persist();render();toast('Unfinished plan topics now use '+minutes+' minutes each'); },
   backlogFilter: el => {
     if (!Object.hasOwn(backlogView, el.dataset.key)) return;
     backlogView[el.dataset.key] = el.value;

@@ -84,7 +84,7 @@ Exports `apiKey`, `authDomain`, `projectId` and `appId`. These identify the web 
 
 ### `my-timetable.csv`: your timetable
 
-Contains 542 original topic groups for Days 1–190, extracted from the uploaded PDF. The cover says 200 days, but Days 191–200 are absent. Topic numbers are lesson identifiers, not durations. Original groups use an estimated hour because the PDF provides no durations.
+Contains 542 original topic groups for Days 1–190, extracted from the uploaded PDF. The cover says 200 days, but Days 191–200 are absent. Topic numbers are lesson identifiers, not durations. The CSV retains one-hour placeholder estimates because the PDF provides no durations. The app now assigns the selected 45 or 60 minutes to each individual unfinished/future lesson.
 
 Columns: `Day,Date,Subject,Topic,Planned Hours,Notes`. Blank dates are filled using the chosen Day 1 date. Quoted CSV values preserve commas inside topics. The current importer does not save the Notes column into plan rows.
 
@@ -213,7 +213,7 @@ Achievement %    = achieved minutes / planned minutes × 100
 
 Future rows and rows excluded by skip-past mode are not counted as overdue. Extra sessions, to-dos and quiz scores are not silently credited to plan rows.
 
-Example: a 60-minute `Number Series 1,2,3` group becomes three 20-minute tasks. Logging 10 minutes against Number Series 1 leaves 10 minutes on that lesson and 50 minutes across the original group. A 60-minute group with four lessons becomes four 15-minute tasks. Whole-minute division distributes rounding remainders so the total duration is preserved.
+Example: `Number Series 1,2,3` becomes three individual 60-minute tasks by default (180 planned minutes), or three 45-minute tasks if selected (135 planned minutes). Logging 10 minutes against a 60-minute Number Series 1 leaves 50 minutes on that lesson. Completed historical groups retain their old total when separated; actual recorded study minutes are never multiplied.
 
 Some old dashboard/report statistics count all study logs or all tasks, including manual additions. The imported-plan panel uses only matching plan tasks. Read the labels rather than assuming these are identical measures.
 
@@ -626,3 +626,10 @@ Home’s **Backlog recovery plan** spreads the current overdue plan workload acr
 Each date reserves its remaining original plan lessons and manual tasks first, then breaks/revision; catch-up fills spare time evenly across dates with capacity. Pinned backlog comes first, then oldest work, with partial lessons permitted. Today excludes elapsed clock time and respects any manually entered remaining-time limit. Future dates use full windows. The device’s local clock supplies dates/times. Full or overloaded days get no extra work, and any unallocated backlog is reported rather than hidden.
 
 Expand a date to see catch-up time ranges and original lesson details. Log progress for today, or Refresh plan after time has passed. The suggestion rolls forward and recalculates from actual remaining work; it does not reschedule original tasks, change achievement totals, create calendar bookings, or guarantee that future study will happen. The separate daily target shows maximum catch-up capacity; the multi-day plan spreads that capacity across days. Increase the reserve for longer breaks/reviews or other commitments.
+
+
+### 45–60 minutes per plan lesson
+
+Unfinished and future plan lessons now use **60 minutes per individual topic** by default. Under **SSC Plan → Time per plan topic**, choose **45 minutes** or **60 minutes** for all unfinished/future lessons. Numbered groups are split into individual lessons with the full selected duration each, instead of dividing one hour among them. This setting applies to existing plan estimates when the app loads and to new imports. CSV hours are validated, then replaced by the selected estimate for unfinished work.
+
+Completed lessons retain their historical estimates and completion dates. Actual study minutes, existing task IDs and linked logs are preserved. Partial lessons keep their recorded minutes and gain the appropriate remaining time; reducing a target can finish a lesson if its existing recorded minutes already meet it. Plan totals, gaps and recovery suggestions use the updated estimates, so busy days may exceed the available study windows and show a shortfall. Existing manually added tasks and focus/break timer durations are separate; new manual tasks default to 60 minutes.
