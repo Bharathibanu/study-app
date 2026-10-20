@@ -117,3 +117,6 @@ node tests/sync-browser.cjs
 ```
 
 Browser checks require Playwright and Chromium. They serve temporary test-only endpoints and never create actual Firebase accounts.
+
+
+Revision queue display: each review stage (Day 1, 3, 7, 15, 30) has a separate labelled box with due and upcoming counts. Topics and metadata occupy separate lines, with explicit Overdue / Due today / Upcoming badges. The boxes represent review intervals, not timetable days. All queued reviews are accessible; the former 60-item display cap is removed. Review timing, pass/fail actions and stored progress are unchanged.

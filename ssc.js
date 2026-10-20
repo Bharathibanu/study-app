@@ -1,4 +1,4 @@
-import { SSC_SUBJECTS, EXAMS, topicKey, topicStats, revisionQueue, mockResult, validateMockSections, validateBank, validateAttempt } from './ssc-core.js';
+import { REVISION_DAYS, SSC_SUBJECTS, EXAMS, topicKey, topicStats, revisionQueue, mockResult, validateMockSections, validateBank, validateAttempt } from './ssc-core.js';
 
 /* SSC tools use the existing account state. The question bank stays on this device. */
 export function installSsc(c) {
@@ -78,7 +78,13 @@ export function installSsc(c) {
   }
   function revisionsView() {
     const s=ensure(),queue=revisionQueue(s,today()),due=queue.filter(r=>r.isDue);
-    return card('Automatic revision queue',`<p class="quiet">Completed lessons and open mistakes return at Days 1, 3, 7, 15 and 30 from their completion/entry date. A failed review comes back tomorrow. Only marking “Recalled” advances a stage.</p><p><b>${due.length} due now</b> · ${queue.length-due.length} upcoming</p>${queue.slice(0,60).map(r=>`<div class="li"><div class="l"><b>${esc(r.topic)}</b><small>${esc(r.subj)} · ${r.kind} · due ${esc(r.due)} · Day ${r.interval} review</small></div>${r.isDue?`${button('sscReviewPass','Recalled','data-key="'+esc(r.key)+'"')}${button('sscReviewFail','Needs review','data-key="'+esc(r.key)+'"')}`:'<span class="badge">Upcoming</span>'}${r.kind==='mistake'?button('sscReviewMistake','See mistake','data-id="'+esc(r.id)+'"'):''}</div>`).join('')||'<p class="empty">Complete a lesson or record a mistake to begin revision.</p>'}${queue.length>60?'<p class="quiet">Showing the earliest 60 reviews.</p>':''}`)+card('Recent reviews',s.revisionHistory.slice().sort((a,b)=>b.at-a.at).slice(0,12).map(r=>`<p>${esc(r.topic)} · ${esc(r.date)} · ${r.passed?'Recalled':'Needs review'}${button('sscDeleteReview','Undo','data-id="'+esc(r.id)+'"')}</p>`).join('')||'<p class="quiet">No reviews recorded yet.</p>');
+    const stages=REVISION_DAYS.map(interval=>{
+      const rows=queue.filter(r=>r.interval===interval), dueCount=rows.filter(r=>r.isDue).length;
+      return `<section class="revision-stage" aria-labelledby="revision-day-${interval}" data-stage="${interval}"><div class="revision-stage-heading"><h4 id="revision-day-${interval}">Day ${interval}</h4><span class="quiet">${dueCount} due now · ${rows.length-dueCount} upcoming</span></div>
+        ${rows.map(r=>`<article class="revision-item"><div class="revision-item-heading"><b>${esc(r.topic)}</b><span class="badge${r.isDue?' amber':''}">${r.isDue?r.due<today()?'Overdue':'Due today':'Upcoming'}</span></div><small>${esc(r.subj)} · ${r.kind==='mistake'?'Mistake':'Lesson'} · Due ${esc(r.due)} · Day ${interval} review</small><div class="actions">${r.isDue?`${button('sscReviewPass','Recalled','data-key="'+esc(r.key)+'"')}${button('sscReviewFail','Needs review','data-key="'+esc(r.key)+'"')}`:''}${r.kind==='mistake'?button('sscReviewMistake','See mistake','data-id="'+esc(r.id)+'"'):''}</div></article>`).join('') || '<p class="quiet">No reviews at this stage.</p>'}
+      </section>`;
+    }).join('');
+    return card('Automatic revision queue',`<p class="quiet">Completed lessons and open mistakes return at Days 1, 3, 7, 15 and 30 from their completion/entry date. Each box is a review stage, not a timetable day. A failed review comes back tomorrow. Only marking “Recalled” advances a stage.</p><p><b>${due.length} due now</b> · ${queue.length-due.length} upcoming</p>${!queue.length?'<p class="empty">Complete a lesson or record a mistake to begin revision.</p>':''}<div class="revision-stages">${stages}</div>`)+card('Recent reviews',s.revisionHistory.slice().sort((a,b)=>b.at-a.at).slice(0,12).map(r=>`<p>${esc(r.topic)} · ${esc(r.date)} · ${r.passed?'Recalled':'Needs review'}${button('sscDeleteReview','Undo','data-id="'+esc(r.id)+'"')}</p>`).join('')||'<p class="quiet">No reviews recorded yet.</p>');
   }
   function mockForm() {
     const fields=[{k:'name',label:'Test name / provider',req:1},select('tier','CGL tier',['Tier I','Tier II / custom'],'Tier I'),dateField];
