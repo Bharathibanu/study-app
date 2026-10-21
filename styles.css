@@ -412,6 +412,3 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 .revision-item small{display:block;margin:8px 0;color:var(--muted);line-height:1.6}
 .revision-item .actions{margin-top:8px}
 @media(max-width:700px){.revision-stages{grid-template-columns:1fr}}
-
-.recovery-days{display:grid;gap:12px;margin:14px 0}.recovery-day{border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}.recovery-day summary{cursor:pointer;overflow-wrap:anywhere}.recovery-day summary span{display:block;color:var(--muted);margin-top:6px}.recovery-chunk{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}.recovery-chunk small{display:block;color:var(--muted);line-height:1.6;margin-top:6px}.recovery-chunk .btn{flex-shrink:0}
-@media(max-width:600px){.recovery-chunk{flex-direction:column;align-items:flex-start}}

@@ -155,56 +155,6 @@ export function weeklySubjectReview(state,today) {
   return {since,rows:[...groups.values()].sort((a,b)=>a.subj.localeCompare(b.subj)).map(g=>({...g,accuracy:g.attempted?g.correct/g.attempted*100:null,seconds:g.timedAttempts?g.timedSeconds/g.timedAttempts:null}))};
 }
 
-export const DEFAULT_RECOVERY = {days:7,buffer:30,windows:[
-  {label:'Morning',start:'04:00',end:'08:00'},
-  {label:'Evening',start:'19:00',end:'20:00'},
-  {label:'Night',start:'21:00',end:'22:30'}
-]};
-const clockMinutes = value => /^\d{2}:\d{2}$/.test(value) && Number(value.slice(0,2))<24 && Number(value.slice(3))<60 ? Number(value.slice(0,2))*60+Number(value.slice(3)) : NaN;
-export function validateRecovery(config) {
-  if(!Number.isInteger(config.days) || config.days<1 || config.days>30 || !Number.isInteger(config.buffer) || config.buffer<0 || config.buffer>1440)throw new Error('Choose 1–30 recovery days and a reserve of 0–1440 minutes.');
-  if(!Array.isArray(config.windows) || config.windows.length!==3)throw new Error('Set all three study windows.');
-  const windows=config.windows.map(w=>({...w,from:clockMinutes(w.start),to:clockMinutes(w.end)})).sort((a,b)=>a.from-b.from);
-  if(windows.some((w,i)=>!Number.isFinite(w.from) || !Number.isFinite(w.to) || w.to<=w.from || i>0 && w.from<windows[i-1].to))throw new Error('Each study window must end after it starts, and windows must not overlap.');
-  return {days:config.days,buffer:config.buffer,windows:windows.map(({label,start,end})=>({label,start,end}))};
-}
-export function recoveryConfig(state) {
-  try{return validateRecovery(state.settings?.recovery || DEFAULT_RECOVERY);}catch{return clone(DEFAULT_RECOVERY);}
-}
-export function backlogRecovery(state,today,nowMinute=0) {
-  const config=recoveryConfig(state), pinned=new Set(dailyFocusSummary(state,today).pins.map(p=>p.id));
-  const backlog=pendingPlan(state,today).filter(r=>r.date<today)
-    .sort((a,b)=>Number(pinned.has(b.id))-Number(pinned.has(a.id))||a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
-  const tasks=new Map((state.tasks || []).filter(t=>t.pk).map(t=>[t.pk,t]));
-  const days=Array.from({length:config.days},(_,i)=>{
-    const date=addDays(today,i), windows=config.windows.map(w=>({...w,from:Math.max(clockMinutes(w.start),i===0?nowMinute:0),to:clockMinutes(w.end)})).filter(w=>w.to>w.from);
-    const windowMinutes=windows.reduce((n,w)=>n+w.to-w.from,0), override=i===0?dailyFocusSummary(state,today).available:null;
-    const available=Math.max(0,Math.floor(override===null?windowMinutes:Math.min(windowMinutes,override)));
-    const regular=(state.plan || []).filter(r=>r.date===date && (!state.planFrom || r.date>=state.planFrom)).reduce((n,r)=>n+Math.max(0,r.min-Math.max(0,Number(tasks.get([r.date,r.subj,r.topic].join('|'))?.spent)||0)),0)+
-      (state.tasks || []).filter(t=>!t.pk && !t.done && t.date===date).reduce((n,t)=>n+Math.max(0,t.plan-t.spent),0);
-    const reserved=Math.min(available,regular), buffer=Math.min(config.buffer,Math.max(0,available-reserved));
-    return {date,windows,available,regular,reserved,shortfall:Math.max(0,regular-available),buffer,capacity:Math.max(0,Math.floor(available-reserved-buffer)),target:0,chunks:[]};
-  });
-  const total=backlog.reduce((n,r)=>n+r.gap,0);let remaining=Math.min(total,days.reduce((n,d)=>n+d.capacity,0));
-  // Equal daily loads, redistributing around days with little or no spare time.
-  while(remaining>0){let allocated=0;for(const d of days){const m=Math.min(1,d.capacity-d.target,remaining);if(m>0){d.target+=m;remaining-=m;allocated+=m;}}if(!allocated)break;}
-  let index=0,left=backlog[0]?.gap || 0;
-  for(const d of days){
-    let reserve=d.reserved+d.buffer,budget=d.target, available=d.available;
-    for(const w of d.windows){
-      let start=w.from,end=Math.min(w.to,w.from+available);available-=end-start;
-      const reserved=Math.min(reserve,end-start);reserve-=reserved;start+=reserved;
-      while(start<end && budget>0 && index<backlog.length){
-        const minutes=Math.min(left,budget,end-start);d.chunks.push({...backlog[index],minutes,start,end:start+minutes,window:w.label});
-        budget-=minutes;left-=minutes;start+=minutes;
-        if(left<=0){index++;left=backlog[index]?.gap || 0;}
-      }
-    }
-  }
-  const scheduled=days.reduce((n,d)=>n+d.target,0);
-  return {config,days,total,scheduled,unscheduled:Math.max(0,total-scheduled),dailyMinutes:config.windows.reduce((n,w)=>n+clockMinutes(w.end)-clockMinutes(w.start),0)};
-}
-
 // Moving a plan keeps each task's identity, study credit and linked logs intact.
 export function postponePlan(state,fromDate) {
   const moved=new Map();

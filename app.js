@@ -5,7 +5,7 @@ import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
-import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, backlogRecovery, recoveryConfig, validateRecovery, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes } from './ssc-core.js';
+import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -256,20 +256,6 @@ function backlogHTML(pending) {
       ${rows.map(r=>{const age=diff(r.date,today());return `<article class="backlog-row"><div><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Plan day ${esc(r.day)} · ${fmtD(r.date)} · ${r.gap} min left</small><span class="badge${age?' amber':''}">${carryLabel(age)}${age>3?' · Critical':''}</span></div>${r.task?`<div class="actions"><button class="btn sm ghost" data-act="partial" data-id="${esc(r.task.id)}">Log progress</button>${pinButton(r.task.id)}</div>`:''}</article>`;}).join('')}</details>`).join('') || '<p class="quiet">No pending lessons match these filters. Choose All subjects and All days to see the full list.</p>'}
     </section>`;
 }
-const clockLabel = minute => { const h=Math.floor(minute/60), m=Math.floor(minute%60); return `${h%12 || 12}:${pad(m)} ${h<12?'AM':'PM'}`; };
-function recoveryHTML() {
-  const now=new Date(), r=backlogRecovery(S,today(),now.getHours()*60+now.getMinutes());
-  return card('Backlog recovery plan', `<div class="actions"><button class="btn sm ghost" data-act="recoverySettings">Edit study windows</button><button class="btn sm ghost" data-act="refreshRecovery">Refresh plan</button></div>
-    <p>${r.config.windows.map(w=>`${esc(w.label)}: <b>${esc(w.start)}–${esc(w.end)}</b>`).join(' · ')} · <b>${hrs(r.dailyMinutes)} hours/day</b></p>
-    <p class="quiet">A rolling ${r.config.days}-day suggestion using your device’s local clock. Elapsed time today is excluded. Daily lessons and manual tasks get time first, plus up to ${r.config.buffer} min/day reserved for breaks and revision. Any “remaining time today” limit also applies today. Catch-up is spread across spare time; pinned overdue lessons come first, then oldest work. Original plan dates and achievements are preserved.</p>
-    <p role="status"><b>${r.total} min overdue</b> · ${r.scheduled} min allocated · ${r.unscheduled} min still to fit.</p>
-    ${r.unscheduled?'<p class="err">The backlog does not fit this recovery period. Extend the period or adjust your study windows; remaining work stays visible.</p>':''}
-    <div class="recovery-days">${r.days.map((d,i)=>`<details class="recovery-day" data-date="${esc(d.date)}"${i===0?' open':''}><summary><b>${esc(longD(d.date))}</b><span>${d.target} min catch-up · ${d.available} min available</span></summary>
-      <p class="quiet">Daily lessons/tasks: ${d.regular} min (${d.reserved} min reserved). Breaks/revision: ${d.buffer} min reserved.</p>
-      ${d.shortfall?`<p class="err">Daily lessons/tasks exceed available time by ${d.shortfall} min. No backlog is added to this day.</p>`:''}
-      ${d.chunks.map(c=>`<article class="recovery-chunk"><div><b>${esc(c.subj)} · ${esc(c.topic)}</b><small>${esc(clockLabel(c.start))}–${esc(clockLabel(c.end))} · ${c.minutes} min · Original plan day ${esc(c.day)} (${fmtD(c.date)})</small></div>${i===0?`<button class="btn sm ghost" data-act="partial" data-id="${esc(c.id)}">Log progress</button>`:''}</article>`).join('') || '<p class="quiet">No catch-up allocated to this day.</p>'}
-      </details>`).join('')}</div><p class="quiet">Suggestions recalculate when you log progress, reopen Home or select Refresh plan. They are not calendar bookings. The daily catch-up target above shows the maximum spare time; this recovery plan spreads work more evenly. Increase the reserve if breaks or revision need longer.</p>`, ' id="recovery-plan" style="margin-bottom:14px"');
-}
 function dailyPlannerHTML() {
   const f = dailyFocusSummary(S,today()), week=weeklySubjectReview(S,today());
   const priorities = f.pins.map(r=>`<li><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>${r.gap} min left</small><div class="actions">${pinButton(r.id)}<button class="btn sm" data-act="partial" data-id="${esc(r.id)}">Log progress</button></div></li>`).join('');
@@ -277,7 +263,7 @@ function dailyPlannerHTML() {
     card('Daily catch-up target', `<p>${f.available===null?'Set your remaining study time for today.':`Remaining time set: <b>${f.available} min</b>. Today’s unfinished plan: <b>${f.todayMinutes} min</b>. Overdue plan: <b>${f.backlog} min</b>.`}</p><button class="btn sm ghost" data-act="catchupTime">Set remaining time</button>
     ${f.available===null?'':`<p role="status">Catch-up target: <b>${f.target} min</b>${f.shortfall?` · Today’s plan exceeds your remaining time by ${f.shortfall} min.`:'.'}</p><p class="quiet">Today’s plan gets time first; the remaining time goes to overdue lessons. Pinned overdue lessons come first, then oldest work. This is a suggestion; it does not move dates or record study time. Update remaining time as your day changes. Extra tasks and revision need their own time allowance.</p>
     <ul class="priority-list">${f.chunks.map(r=>`<li>${esc(r.subj)} · ${esc(r.topic)} <b>${r.minutes} min${r.minutes<r.gap?' (part of lesson)':''}</b></li>`).join('') || '<li>No catch-up work fits this time allowance.</li>'}</ul>`}`, ' style="margin-bottom:14px"') +
-    recoveryHTML() + card('Weekly subject review', `<p class="quiet">${fmtD(week.since)}–${fmtD(today())} (last 7 days). Study and questions use this period. Backlog shows all overdue plan lessons as of today. Accuracy uses attempted questions; speed uses timed attempts only.</p><div class="tablewrap"><table><thead><tr><th>Subject</th><th>Study</th><th>Backlog</th><th>Attempted</th><th>Accuracy</th><th>Seconds / question</th></tr></thead><tbody>${week.rows.map(r=>`<tr><td>${esc(r.subj)}</td><td>${r.minutes} min</td><td>${r.backlogTopics} lessons · ${r.backlogMinutes} min</td><td>${r.attempted}</td><td>${r.accuracy===null?'No attempts':r.accuracy.toFixed(1)+'%'}</td><td>${r.seconds===null?'Not timed':r.seconds.toFixed(1)}</td></tr>`).join('') || '<tr><td colspan="6">No study, question attempts or plan backlog yet.</td></tr>'}</tbody></table></div>`, ' style="margin-bottom:14px"');
+    card('Weekly subject review', `<p class="quiet">${fmtD(week.since)}–${fmtD(today())} (last 7 days). Study and questions use this period. Backlog shows all overdue plan lessons as of today. Accuracy uses attempted questions; speed uses timed attempts only.</p><div class="tablewrap"><table><thead><tr><th>Subject</th><th>Study</th><th>Backlog</th><th>Attempted</th><th>Accuracy</th><th>Seconds / question</th></tr></thead><tbody>${week.rows.map(r=>`<tr><td>${esc(r.subj)}</td><td>${r.minutes} min</td><td>${r.backlogTopics} lessons · ${r.backlogMinutes} min</td><td>${r.attempted}</td><td>${r.accuracy===null?'No attempts':r.accuracy.toFixed(1)+'%'}</td><td>${r.seconds===null?'Not timed':r.seconds.toFixed(1)}</td></tr>`).join('') || '<tr><td colspan="6">No study, question attempts or plan backlog yet.</td></tr>'}</tbody></table></div>`, ' style="margin-bottom:14px"');
 }
 function planTracking() {
   if (!S.plan.length) return card('Plan tracking', '<p class="quiet">Load your SSC plan to track achievement, gaps and warnings.</p>');
@@ -401,7 +387,7 @@ function openForm(title, fields, submit, cb, opts) {
   $('#merr').textContent = '';
   $('#msubmit').textContent = submit || 'Save';
   $('#mfoot').hidden = false; $('#modal').hidden = false;
-  const first = $('#mbody input,#mbody select,#mbody textarea'); if (first && !(opts && opts.noFocus)) setTimeout(() => { if(first.isConnected && !$('#modal').hidden && !$('#modal').contains(document.activeElement))first.focus(); }, 60);
+  const first = $('#mbody input,#mbody select,#mbody textarea'); if (first && !(opts && opts.noFocus)) setTimeout(() => { if(first.isConnected && !$('#modal').hidden && !$('#mbody').contains(document.activeElement))first.focus(); }, 60);
 }
 function openMenu(title, items) {
   modalCb = null; $('#mtitle').textContent = title; $('#mfoot').hidden = true; $('#merr').textContent = '';
@@ -915,7 +901,7 @@ VIEWS.plan = function () {
   const t = today(), has = S.plan.length;
   const total = has ? Math.max(...S.plan.map((r) => r.day)) : 0, cur = has ? Math.max(0, ...S.plan.filter((r) => r.date <= t).map((r) => r.day)) : 0;
   const next = S.plan.filter((r) => r.date >= t).slice(0, 14);
-  return `<div class="card" style="margin-bottom:14px"><h3>Time per plan topic</h3><label class="label" for="planLessonMinutes">Lesson duration</label><select class="inp" id="planLessonMinutes" data-chg="lessonDuration"><option value="60" ${lessonMinutes(S)===60?'selected':''}>60 minutes per topic</option><option value="45" ${lessonMinutes(S)===45?'selected':''}>45 minutes per topic</option></select><p class="quiet">Applies to every unfinished and future plan lesson, including each numbered lesson. Completed lessons and actual study logs keep their history. Daily planned hours, gaps and recovery suggestions update to match.</p></div><div class="grid g2">
+  return `<div class="card" style="margin-bottom:14px"><h3>Time per plan topic</h3><label class="label" for="planLessonMinutes">Lesson duration</label><select class="inp" id="planLessonMinutes" data-chg="lessonDuration"><option value="60" ${lessonMinutes(S)===60?'selected':''}>60 minutes per topic</option><option value="45" ${lessonMinutes(S)===45?'selected':''}>45 minutes per topic</option></select><p class="quiet">Applies to every unfinished and future plan lesson, including each numbered lesson. Completed lessons and actual study logs keep their history. Daily planned hours, gaps and the daily catch-up target update to match.</p></div><div class="grid g2">
   ${card('Your plan', has ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Progress</span><span class="mono">Day ${cur} / ${total}</span></div><div class="bar warnbar"><i style="width:${Math.round(cur / total * 100)}%"></i></div><p class="quiet" style="margin-top:10px">${S.plan.length} plan lines from ${fmtD(S.plan[0].date)} to ${fmtD(S.plan[S.plan.length - 1].date)}. Each day's lines appear in Today's schedule automatically.</p><div class="actions" style="margin-top:12px"><button class="btn sm" data-act="splitLessons">Separate numbered lessons</button><button class="btn sm ghost" data-act="skipToday">Skip today (push plan by 1 day)</button><button class="btn sm ghost" data-act="clearPlan">Remove plan</button></div>` : '<div class="empty"><b>No plan yet</b>Upload your 200-day strategy as a CSV file, or paste it on the right.</div>')}
   ${card('Upload or paste', `<p class="quiet" style="margin-bottom:10px">Columns: Day, Date, Subject, Topic, Planned Hours, Notes. Date is optional if you set Day 1 below. From Excel, use Save As CSV.</p>
   <div class="setrow"><label class="label" for="pfile">CSV file</label><input class="inp" type="file" id="pfile" accept=".csv,.txt,text/csv,text/plain" data-chg="planFile"></div>
@@ -1205,18 +1191,6 @@ function download(name, text, type) {
 }
 function applyTheme() { const th = lsGet('sst_theme'); if (th) document.documentElement.dataset.theme = th; }
 const ACT = {
-  refreshRecovery: () => {const y=window.scrollY;render();window.scrollTo(0,y);},
-  recoverySettings: () => {
-    const config=recoveryConfig(S), fields=[];
-    config.windows.forEach((w,i)=>{fields.push({k:'start'+i,label:w.label+' start (24-hour time)',type:'time',value:w.start,req:1},{k:'end'+i,label:w.label+' end (24-hour time)',type:'time',value:w.end,req:1});});
-    fields.push({k:'days',label:'Recovery period (1–30 days)',type:'number',value:config.days,min:1,req:1},{k:'buffer',label:'Daily minutes reserved for breaks and revision',type:'number',value:config.buffer,min:0,req:1});
-    openForm('Study windows and recovery plan',fields,'Save schedule',v=>{
-      let value;
-      try { value=validateRecovery({days:v.days,buffer:v.buffer,windows:config.windows.map((w,i)=>({label:w.label,start:v['start'+i],end:v['end'+i]}))}); }
-      catch(error) { toast(error.message); return; }
-      S.settings.recovery=value;persist();render();toast('Study windows saved');
-    });
-  },
   pinLesson: d => {
     const f=dailyFocusSummary(S,today()), prefs=focusPrefs();
     const pins=f.pins.map(p=>p.id);

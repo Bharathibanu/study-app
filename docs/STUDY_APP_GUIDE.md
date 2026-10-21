@@ -619,17 +619,11 @@ In **Daily catch-up target**, set minutes still available today. The suggestion 
 **Weekly subject review** covers the last seven calendar days including today: logged study minutes, attempted-question accuracy and average seconds per timed question. Untimed attempts affect accuracy but not speed. Backlog includes all overdue unfinished plan lessons, excluding future and skipped dates. Empty results display “No attempts” / “Not timed”. Study logs alone never complete a plan lesson.
 
 
-### Recovery timetable
-
-Home’s **Backlog recovery plan** spreads the current overdue plan workload across seven days, using Morning **04:00–08:00**, Evening **19:00–20:00** and Night **21:00–22:30** (390 minutes / 6.5 hours per full day). **Edit study windows** changes all three windows, a 1–30-day recovery horizon, and a default 30-minute daily reserve for breaks/revision. These preferences save locally and sync in account settings.
-
-Each date reserves its remaining original plan lessons and manual tasks first, then breaks/revision; catch-up fills spare time evenly across dates with capacity. Pinned backlog comes first, then oldest work, with partial lessons permitted. Today excludes elapsed clock time and respects any manually entered remaining-time limit. Future dates use full windows. The device’s local clock supplies dates/times. Full or overloaded days get no extra work, and any unallocated backlog is reported rather than hidden.
-
-Expand a date to see catch-up time ranges and original lesson details. Log progress for today, or Refresh plan after time has passed. The suggestion rolls forward and recalculates from actual remaining work; it does not reschedule original tasks, change achievement totals, create calendar bookings, or guarantee that future study will happen. The separate daily target shows maximum catch-up capacity; the multi-day plan spreads that capacity across days. Increase the reserve for longer breaks/reviews or other commitments.
-
-
 ### 45–60 minutes per plan lesson
 
 Unfinished and future plan lessons now use **60 minutes per individual topic** by default. Under **SSC Plan → Time per plan topic**, choose **45 minutes** or **60 minutes** for all unfinished/future lessons. Numbered groups are split into individual lessons with the full selected duration each, instead of dividing one hour among them. This setting applies to existing plan estimates when the app loads and to new imports. CSV hours are validated, then replaced by the selected estimate for unfinished work.
 
-Completed lessons retain their historical estimates and completion dates. Actual study minutes, existing task IDs and linked logs are preserved. Partial lessons keep their recorded minutes and gain the appropriate remaining time; reducing a target can finish a lesson if its existing recorded minutes already meet it. Plan totals, gaps and recovery suggestions use the updated estimates, so busy days may exceed the available study windows and show a shortfall. Existing manually added tasks and focus/break timer durations are separate; new manual tasks default to 60 minutes.
+Completed lessons retain their historical estimates and completion dates. Actual study minutes, existing task IDs and linked logs are preserved. Partial lessons keep their recorded minutes and gain the appropriate remaining time; reducing a target can finish a lesson if its existing recorded minutes already meet it. Plan totals, gaps and the daily catch-up target use the updated estimates. More time per lesson increases the planned daily workload. Existing manually added tasks and focus/break timer durations are separate; new manual tasks default to 60 minutes.
+
+
+The multi-day Backlog recovery plan and its study-window editor have been removed. Daily priority pins, the daily catch-up target, subject/carry filters and weekly subject review remain available. Existing plan, study logs and account data are retained.
