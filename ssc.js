@@ -1,4 +1,4 @@
-import { REVISION_DAYS, SSC_SUBJECTS, EXAMS, topicKey, topicStats, revisionQueue, mockResult, validateMockSections, validateBank, validateAttempt } from './ssc-core.js';
+import { clone, applyRecordEdit, REVISION_DAYS, SSC_SUBJECTS, EXAMS, topicKey, topicStats, revisionQueue, mockResult, validateMockSections, validateBank, validateAttempt } from './ssc-core.js';
 
 /* SSC tools use the existing account state. The question bank stays on this device. */
 export function installSsc(c) {
@@ -14,8 +14,7 @@ export function installSsc(c) {
   const planTopics=()=>[...new Set((state().plan || []).map(row=>row.topic))];
   function form(title,fields,label,save) {
     fields=fields.map(f=>f.k==='date' && f===dateField ? {...f,value:today()} : f);
-    const submit=v=>{try{save(v);}catch(e){toast(e.message);openForm(title,fields.map(f=>({...f,value:v[f.k]})),label,submit);}};
-    openForm(title,fields,label,submit);
+    openForm(title,fields,label,save);
   }
   function bankStore(mode,value) {
     return new Promise((resolve,reject)=>{
@@ -62,15 +61,17 @@ export function installSsc(c) {
     return card('2024–2025 SSC PYQ bank',`<p><b>${pyqs.length} imported PYQs</b> · ${bank.filter(q=>q.kind==='original').length} original practice questions.</p><p class="quiet">A complete verified collection is not installed. SSC papers could not be fetched during development. Original practice is never labelled as PYQ. Imported sources are not independently verified.</p><p>Use papers and answer keys you are permitted to reuse. Each PYQ must identify exam, year, tier, paper date, shift, question number and source.</p><div class="actions">${button('nav','Practice questions','data-v="practice"')}<label class="btn sm ghost">Import question JSON<input type="file" accept=".json,application/json" data-chg="sscImportBank" hidden></label>${button('sscBankTemplate','Download import template')}${button('sscResetBank','Remove imported bank')}</div><p class="quiet">The question bank stays on this device, outside your Firebase account document. Import the same bank on other devices if needed. Your attempts and mistake notes do sync.</p><p><a href="https://ssc.gov.in/" target="_blank" rel="noopener noreferrer">SSC official website</a> — availability of old response sheets and reuse permission must be checked.</p>${bankError?`<p class="err">${esc(bankError)}</p>`:''}<div class="tablewrap"><table><thead><tr><th>Exam / year</th><th>Subject / topic</th><th>Source</th></tr></thead><tbody>${pyqs.slice(0,50).map(q=>`<tr><td>${esc(q.exam)} ${q.year}<br>${esc(q.tier)} / ${esc(q.shift)}</td><td>${esc(q.subj)} / ${esc(q.topic)}</td><td><a href="${esc(q.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(q.sourceTitle)}</a></td></tr>`).join('')}</tbody></table></div>`);
   }
   function mistakeForm(entry) {
-    const e=entry||{};
-    form(e.id?'Edit mistake':'Add mistake',[
+    const e=entry||{}, original=clone(e);
+    const fields=[
       select('subj','Subject',SSC_SUBJECTS,e.subj||'Quant'),{k:'topic',label:'Topic',value:e.topic||'',req:1},
       select('lesson','Link to timetable lesson (optional)',['',...planTopics()],e.lesson||''),
       {k:'question',label:'Question',type:'textarea',value:e.question||'',req:1},{k:'yourAnswer',label:'Your wrong answer',value:e.yourAnswer||''},{k:'correctAnswer',label:'Correct answer',value:e.correctAnswer||'',req:1},
       {k:'method',label:'Correct method / explanation',type:'textarea',value:e.method||'',req:1},
       select('cause','Mistake type',['Unclassified','Concept','Calculation','Reading','Time pressure'],e.cause||'Unclassified'),
       {...dateField,value:e.date||today()},{k:'source',label:'Book / test / source reference',value:e.source||''}
-    ],'Save mistake',v=>{const s=ensure();if(e.id)Object.assign(e,v,{at:Date.now()});else s.mistakeBook.push({...v,id:uid(),at:Date.now(),archived:false});persist();render();});
+    ];
+    const initial=Object.fromEntries(fields.map(f=>[f.k,f.value ?? '']));
+    form(e.id?'Edit mistake':'Add mistake',fields,'Save mistake',v=>{const s=ensure();if(e.id){const saved=applyRecordEdit(s.mistakeBook,e.id,original,v,initial);saved.at=Date.now();}else s.mistakeBook.push({...v,id:uid(),at:Date.now(),archived:false});persist();render();});
   }
   function mistakesView() {
     const s=ensure(),rows=s.mistakeBook.filter(m=>mistFilter==='all'||!m.archived).slice().sort((a,b)=>b.at-a.at);

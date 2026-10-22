@@ -253,3 +253,27 @@ export function logTaskProgress(state,taskId,minutes,metadata) {
   if(task.spent>=task.plan){task.done=true;task.doneDate=metadata.date;}
   return {task,minutes:credit,reason:'saved'};
 }
+
+// Merge only the fields actually changed in an open form into the latest record.
+export function applyRecordEdit(rows,id,original,draft,initial=original) {
+  const record=(rows || []).find(r=>r.id===id);
+  if(!record)throw new Error('This record was deleted on another device. Copy your edits before closing this form.');
+  const changes=[];
+  for(const [key,value] of Object.entries(draft)){
+    if(same(value,initial[key]))continue;
+    if(!same(record[key],original[key]) && !same(record[key],value))throw new Error('This record changed on another device. Copy your edits, then close and reopen the latest record.');
+    changes.push([key,clone(value)]);
+  }
+  for(const [key,value] of changes)record[key]=value;
+  return record;
+}
+export function logBookPages(state,id,pages,date) {
+  const book=(state.books || []).find(b=>b.id===id);
+  if(!book)return {book:null,pages:0};
+  if(!Number.isFinite(pages) || pages<=0 || !validStudyDate(date))throw new Error('Enter positive pages and a valid date.');
+  const history=book.log || [];if(!Array.isArray(history))throw new Error('This book’s reading history could not be read.');
+  const remaining=Math.max(0,book.total-(Number(book.start)||0)-history.reduce((n,r)=>n+(Number(r.pages)||0),0));
+  const credit=Math.min(pages,remaining);
+  if(credit){book.log=history;book.log.push({date,pages:credit});}
+  return {book,pages:credit};
+}

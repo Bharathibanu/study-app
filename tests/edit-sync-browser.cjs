@@ -1,0 +1,59 @@
+/* Integration test with a fake server: never contacts real Firebase. */
+const {chromium}=require('playwright');const assert=require('assert/strict');const http=require('http'),fs=require('fs'),path=require('path');
+(async()=>{
+ const root=path.resolve(__dirname,'..'),src=fs.readFileSync(path.join(root,'ssc-core.js'),'utf8');
+ const {mergeStates}=await import('data:text/javascript;base64,'+Buffer.from(src).toString('base64'));
+ let serverState=null,blockServer=false;
+ const adapter=`export const enabled=true;
+ export async function init(){}
+ export function onUser(cb){setTimeout(()=>cb({uid:'qa-account',email:'qa@example.invalid'}),0);}
+ export async function signIn(){} export async function signUp(){} export async function signOut(){}
+ export function subscribe(uid,cb){let stopped=false,last='';cb(null,false,false,true);const poll=async()=>{try{const res=await fetch('/__read',{method:'POST'});if(!res.ok)return;const state=await res.json();const str=JSON.stringify(state);if(!stopped&&last!==str){last=str;cb(state?{data:JSON.stringify(state)}:null,false,false,false);}}catch{}};const timer=setInterval(poll,150);poll();return ()=>{stopped=true;clearInterval(timer);};}
+ export async function save(uid,obj,base,force){const res=await fetch('/__save',{method:'POST',body:JSON.stringify({obj,base,force})});const result=await res.json();if(!res.ok){const error=new Error(result.message);Object.assign(error,result);throw error;}return result;}
+ export async function readServer(){const res=await fetch('/__read',{method:'POST'});if(!res.ok)throw new Error('offline');return res.json();}`;
+ const server=http.createServer(async(req,res)=>{
+  res.setHeader('Cache-Control','no-store');
+  if(req.url==='/cloud.js'){res.setHeader('Content-Type','text/javascript');res.end(adapter);return;}
+  if(req.url==='/__read'){res.setHeader('Content-Type','application/json');if(blockServer){res.writeHead(503);res.end('{}');}else res.end(JSON.stringify(serverState));return;}
+  if(req.url==='/__save'){
+   if(blockServer){res.writeHead(503);res.end(JSON.stringify({message:'offline'}));return;}
+   let body='';for await(const chunk of req)body+=chunk;const {obj,base,force}=JSON.parse(body);const result=force?{state:obj,conflicts:[]}:mergeStates(base,obj,serverState);
+   res.setHeader('Content-Type','application/json');if(result.conflicts.length){res.writeHead(409);res.end(JSON.stringify({code:'sync/conflict',remote:serverState,conflicts:result.conflicts,message:'conflict'}));}else{serverState=result.state;res.end(JSON.stringify(serverState));}return;
+  }
+  const name=new URL(req.url,'http://test').pathname,file=path.resolve(root,'.'+(name==='/'?'/index.html':name));if(!file.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}
+  try{res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.html')?'text/html':file.endsWith('.json')?'application/json':'image/png');res.end(fs.readFileSync(file));}catch{res.writeHead(404);res.end();}
+ });
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+ try {
+  const a=await browser.newPage({viewport:{width:390,height:900},reducedMotion:'reduce'}),b=await browser.newPage({viewport:{width:1440,height:900},reducedMotion:'reduce'});const errors=[];for(const p of [a,b])p.on('pageerror',e=>errors.push(e.message));
+  blockServer=true;await a.goto(url);await a.locator('#app').waitFor({state:'visible'});assert.equal(await a.locator('#sync').textContent(),'Cached data · awaiting server');
+  blockServer=false;await a.locator('#sync').filter({hasText:'server confirmed'}).waitFor();await b.goto(url);await b.locator('#app').waitFor({state:'visible'});await b.locator('#sync').filter({hasText:'server confirmed'}).waitFor();
+  const synced=async p=>p.locator('#sync').filter({hasText:'server confirmed'}).waitFor();
+  const nav=async(p,view)=>{const direct=p.locator('#side [data-v='+view+']');if(await direct.isVisible())await direct.click();else{await p.locator('#side [data-v=more]').click();await p.locator('#view [data-v='+view+']').first().click();}};
+  await nav(a,'todo');await a.locator('[data-act=addTodo]').click();await a.locator('#f_title').fill('Original task');await a.locator('#msubmit').click();await synced(a);await b.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account'))?.todos.length===1);
+  await a.locator('[data-act=editTodo]').click();await a.locator('#f_title').fill('Edited on phone');
+  await nav(b,'set');await b.locator('#s_target').fill('8');await b.locator('#s_target').blur();await synced(b);await a.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).settings.target===8);
+  await a.locator('#msubmit').click();const saved=await a.evaluate(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')));assert.equal(saved.todos[0].title,'Edited on phone');await synced(a);assert.equal(serverState.todos[0].title,'Edited on phone');
+  // Independent field changes merge, and completion flags stay intact.
+  await b.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).todos[0].title==='Edited on phone');
+  await a.locator('[data-act=editTodo]').click();await a.locator('#f_title').fill('Phone title');await nav(b,'todo');await b.locator('[data-act=editTodo]').click();await b.locator('#f_note').fill('Desktop note');await b.locator('#msubmit').click();await synced(b);await b.locator('[data-act=doneTodo]').click();await synced(b);await a.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).todos[0].done);
+  await a.locator('#msubmit').click();await synced(a);assert.equal(serverState.todos[0].title,'Phone title');assert.equal(serverState.todos[0].note,'Desktop note');assert(serverState.todos[0].done);
+  // Same-field changes and deletions are reported without dropping the open draft.
+  for(const p of [a,b]){await nav(p,'todo');await p.locator('[data-act=tFilter][data-v=all]').click();}
+  await b.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).todos[0].title==='Phone title');
+  await a.locator('[data-act=editTodo]').click();await a.locator('#f_title').fill('Phone conflict');await b.locator('[data-act=editTodo]').click();await b.locator('#f_title').fill('Desktop conflict');await b.locator('#msubmit').click();await synced(b);await a.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).todos[0].title==='Desktop conflict');await a.locator('#msubmit').click();await a.locator('#merr').filter({hasText:'changed on another device'}).waitFor();assert.equal(await a.locator('#f_title').inputValue(),'Phone conflict');assert.equal(serverState.todos[0].title,'Desktop conflict');await a.locator('[data-act=closeModal]').first().click();
+  await nav(a,'todo');await a.locator('[data-act=editTodo]').click();await a.locator('#f_title').fill('Deleted draft');await b.locator('[data-act=delTodo]').click();await b.locator('[data-act=delTodo]').click();await synced(b);await a.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).todos.length===0);await a.locator('#msubmit').click();await a.locator('#merr').filter({hasText:'deleted on another device'}).waitFor();assert.equal(await a.locator('#f_title').inputValue(),'Deleted draft');assert.equal(serverState.todos.length,0);await a.locator('[data-act=closeModal]').first().click();
+  let target=8;const unrelatedUpdate=async()=>{target++;await nav(b,'set');await b.locator('#s_target').fill(String(target));await b.locator('#s_target').blur();await synced(b);await a.waitForFunction(value=>JSON.parse(localStorage.getItem('sst_state_qa-account')).settings.target===value,target);};
+  // A cloud update cannot detach a book log or its editor from the active book.
+  await nav(a,'learn');await a.locator('[data-act=addBook]').click();await a.locator('#f_title').fill('Reading book');await a.locator('#f_total').fill('20');await a.locator('#msubmit').click();await synced(a);await a.locator('[data-act=logBook]').click();await unrelatedUpdate();await a.locator('#msubmit').click();await synced(a);assert.equal(serverState.books[0].log.length,1);assert.equal(serverState.books[0].log[0].pages,10);
+  await b.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).books[0]?.log.length===1);await a.locator('[data-act=editBook]').click();await a.locator('#f_title').fill('Edited reading book');await nav(b,'learn');await b.locator('[data-act=logBook]').click();await b.locator('#msubmit').click();await synced(b);await a.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).books[0].log.length===2);await a.locator('#msubmit').click();await synced(a);assert.equal(serverState.books[0].title,'Edited reading book');assert.equal(serverState.books[0].log.length,2);
+  await a.locator('[data-act=editBook]').click();await a.locator('#f_total').fill('30');await a.locator('#msubmit').click();await synced(a);await b.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).books[0].total===30);await a.locator('[data-act=logBook]').click();await b.locator('[data-act=logBook]').click();await b.locator('#msubmit').click();await synced(b);await a.waitForFunction(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')).books[0].log.length===3);await a.locator('#msubmit').click();assert.equal(serverState.books[0].log.length,3);assert.equal(serverState.books[0].log.reduce((n,l)=>n+l.pages,0),30);
+  // Learning cards, diary entries and mistake methods use the same safe edit path.
+  await a.locator('[data-act=addLearn]').click();await a.locator('#f_title').fill('Initial learning');await a.locator('#f_text').fill('Initial explanation');await a.locator('#msubmit').click();await synced(a);await a.locator('[data-act=editLearn]').click();await a.locator('#f_title').fill('Updated learning');await unrelatedUpdate();await a.locator('#msubmit').click();await synced(a);assert.equal(serverState.learn[0].title,'Updated learning');
+  await nav(a,'diary');await a.locator('[data-act=addDiary]').click();await a.locator('#f_text').fill('Initial diary');await a.locator('#msubmit').click();await synced(a);await a.locator('[data-act=editDiary]').click();await a.locator('#f_text').fill('Updated diary');await unrelatedUpdate();await a.locator('#msubmit').click();await synced(a);assert.equal(serverState.diary[0].text,'Updated diary');
+  await nav(a,'mistakes');await a.locator('[data-act=sscMistake]').click();for(const [key,value] of Object.entries({topic:'Audit topic',question:'Question',correctAnswer:'Answer',method:'Initial method'}))await a.locator('#f_'+key).fill(value);await a.locator('#msubmit').click();await synced(a);await a.locator('details.ssc-mistake summary').click();await a.locator('[data-act=sscEditMistake]').click();await a.locator('#f_method').fill('Updated method');await unrelatedUpdate();await a.locator('#msubmit').click();await synced(a);assert.equal(serverState.mistakeBook[0].method,'Updated method');
+  await a.context().setOffline(true);await a.reload();await a.locator('#app').waitFor({state:'visible'});const persisted=await a.evaluate(()=>JSON.parse(localStorage.getItem('sst_state_qa-account')));assert.equal(persisted.diary[0].text,'Updated diary');assert.equal(persisted.mistakeBook[0].method,'Updated method');assert.equal(persisted.books[0].log.reduce((n,l)=>n+l.pages,0),30);assert.deepEqual(errors,[]);
+  console.log('PASS phone/desktop edit sync: fresh-record saves, independent-field merges, conflict/deletion draft retention, book-page cap, learning/diary/mistake edits and offline persistence');
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+})().catch(e=>{console.error(e);process.exitCode=1;});

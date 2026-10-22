@@ -5,7 +5,7 @@ import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
-import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes, repairTaskProgress, logTaskProgress } from './ssc-core.js';
+import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes, repairTaskProgress, logTaskProgress, applyRecordEdit, logBookPages } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -406,7 +406,8 @@ $('#mform').addEventListener('submit', (e) => {
     if (f.type === 'number') { v = v === '' ? '' : Number(v); if (v !== '' && isNaN(v)) { $('#merr').textContent = f.label + ' must be a number.'; return; } if (f.min != null && v !== '' && v < f.min) { $('#merr').textContent = f.label + ' must be at least ' + f.min + '.'; return; } }
     vals[f.k] = v;
   }
-  const cb = modalCb; closeModal(); cb(vals);
+  const cb = modalCb, fields=modalFields; closeModal();
+  try { cb(vals); } catch(error) { modalCb=cb;modalFields=fields;$('#modal').hidden=false;$('#merr').textContent=error.message || 'Could not save. Check your values and try again.'; }
 });
 $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
 document.addEventListener('keydown', (e) => {
@@ -1366,6 +1367,7 @@ function sure(b, label) {
   return true;
 }
 function todoForm(x) {
+  const original=clone(x), initial=x?{title:x.title || '',note:x.note || '',pri:x.pri || 'Normal',due:x.due || '',remind:x.remind || ''}:null;
   openForm(x ? 'Edit to-do' : 'Add to-do', [
     { k: 'title', label: 'What needs doing?', req: 1, value: x ? x.title : '' },
     { k: 'note', label: 'Note', type: 'textarea', value: x ? x.note : '' },
@@ -1373,36 +1375,39 @@ function todoForm(x) {
     { k: 'due', label: 'Due date', type: 'date', value: x ? x.due : '' },
     { k: 'remind', label: 'Reminder (date and time)', type: 'datetime-local', value: x ? x.remind : '' }
   ], x ? 'Save' : 'Add to-do', (v) => {
-    if (x) { const rc = x.remind !== v.remind; Object.assign(x, { title: v.title, note: v.note, pri: v.pri, due: v.due, remind: v.remind }); if (rc) { x.fired = false; x.ack = false; } }
+    if (x) { const previous=S.todos.find(t=>t.id===x.id)?.remind;const saved=applyRecordEdit(S.todos,x.id,original,v,initial);if(previous!==saved.remind){saved.fired=false;saved.ack=false;} }
     else S.todos.push({ id: uid(), created: today(), title: v.title, note: v.note, pri: v.pri, due: v.due, remind: v.remind, fired: false, ack: false, done: false, doneDate: '' });
     persist(); toast(x ? 'Saved' : 'To-do added'); checkReminders(); render();
   });
 }
 function bookForm(b) {
+  const original=clone(b), initial=b?{title:b.title || '',author:b.author || '',total:b.total,start:b.start || 0}:null;
   openForm(b ? 'Edit book' : 'Add book', [
     { k: 'title', label: 'Book name', req: 1, value: b ? b.title : '' },
     { k: 'author', label: 'Author', value: b ? b.author : '' },
     { k: 'total', label: 'Total pages', type: 'number', req: 1, min: 1, value: b ? b.total : '' },
     { k: 'start', label: 'Pages already read before today', type: 'number', min: 0, value: b ? (b.start || 0) : 0 }
   ], b ? 'Save' : 'Add book', (v) => {
-    if (b) Object.assign(b, { title: v.title, author: v.author, total: v.total, start: v.start || 0 });
+    if (b) applyRecordEdit(S.books,b.id,original,{...v,start:v.start || 0},initial);
     else S.books.push({ id: uid(), title: v.title, author: v.author, total: v.total, start: v.start || 0, log: [] });
     persist(); toast(b ? 'Saved' : 'Book added'); render();
   });
 }
 function learnForm(c) {
+  const original=clone(c), initial=c?{title:c.title || '',text:c.text || '',tag:c.tag || '',book:c.book || ''}:null;
   openForm(c ? 'Edit learning card' : 'New learning card', [
     { k: 'title', label: 'Title', req: 1, value: c ? c.title : '', ph: 'e.g. Fundamental Rights, Article 14' },
     { k: 'text', label: 'What I learned', type: 'textarea', rows: 6, req: 1, value: c ? c.text : '' },
     { k: 'tag', label: 'Tag or subject', value: c ? c.tag : '', ph: 'Polity, Maths, English...' },
     { k: 'book', label: 'From book (optional)', type: 'select', options: [['', 'None']].concat(S.books.map((b) => [b.id, b.title])), value: c ? c.book || '' : '' }
   ], c ? 'Save' : 'Save card', (v) => {
-    if (c) Object.assign(c, { title: v.title, text: v.text, tag: v.tag, book: v.book });
+    if (c) applyRecordEdit(S.learn,c.id,original,v,initial);
     else S.learn.push({ id: uid(), date: today(), at: Date.now(), title: v.title, text: v.text, tag: v.tag, book: v.book });
     persist(); toast('Card saved'); render();
   });
 }
 function diaryForm(e) {
+  const original=clone(e), initial=e?{date:e.date || today(),title:e.title || '',text:e.text || '',mood:e.mood || '',star:!!e.star}:null;
   openForm(e ? 'Edit diary entry' : 'Diary entry', [
     { k: 'date', label: 'Date', type: 'date', value: e ? e.date : today() },
     { k: 'title', label: 'Title (optional)', value: e ? e.title : '' },
@@ -1410,7 +1415,7 @@ function diaryForm(e) {
     { k: 'mood', label: 'How was the day?', type: 'select', options: [['', 'Skip']].concat(MOODS), value: e ? e.mood || '' : '' },
     { k: 'star', label: 'Mark as important?', type: 'select', options: [['0', 'No'], ['1', 'Yes, important']], value: e && e.star ? '1' : '0' }
   ], e ? 'Save' : 'Save entry', (v) => {
-    if (e) Object.assign(e, { date: v.date || today(), title: v.title, text: v.text, mood: v.mood, star: v.star === '1' });
+    if (e) applyRecordEdit(S.diary,e.id,original,{...v,date:v.date || today(),star:v.star==='1'},initial);
     else S.diary.push({ id: uid(), date: v.date || today(), at: Date.now(), title: v.title, text: v.text, mood: v.mood, star: v.star === '1' });
     persist(); toast('Diary entry saved'); render();
   });
@@ -1429,7 +1434,15 @@ Object.assign(ACT, {
   tFilter: (d) => { TF = d.v; render(); },
   addBook: () => bookForm(null),
   editBook: (d) => { const b = findBy(S.books, d.id); if (b) bookForm(b); },
-  logBook: (d) => { const b = findBy(S.books, d.id); if (!b) return; openForm('Log pages: ' + b.title, [{ k: 'pages', label: 'Pages covered (' + (b.total - bookRead(b)) + ' left)', type: 'number', req: 1, min: 1, value: 10 }, { k: 'date', label: 'Date', type: 'date', value: today() }], 'Save', (v) => { b.log = b.log || []; b.log.push({ date: v.date || today(), pages: Math.min(v.pages, b.total - bookRead(b)) || v.pages }); persist(); toast(bookRead(b) >= b.total ? 'Book finished' : 'Pages logged'); render(); }); },
+  logBook: d => {
+    const book=findBy(S.books,d.id);if(!book)return;
+    const remaining=Math.max(0,book.total-bookRead(book));if(!remaining){toast('This book is already finished.');return;}
+    openForm('Log pages: '+book.title,[{k:'pages',label:'Pages covered ('+remaining+' left)',type:'number',req:1,min:1,value:Math.min(10,remaining)},{k:'date',label:'Date',type:'date',value:today()}],'Save',v=>{
+      const result=logBookPages(S,d.id,v.pages,v.date || today());
+      if(!result.book){toast('This book is no longer available.');render();return;}
+      if(result.pages)persist();toast(bookRead(result.book)>=result.book.total?'Book finished':'Pages logged');render();
+    });
+  },
   delBook: (d, b) => { if (!sure(b)) return; S.books = S.books.filter((x) => x.id !== d.id); persist(); render(); },
   addLearn: () => { closeModal(); learnForm(null); },
   editLearn: (d) => { const c = findBy(S.learn, d.id); if (c) learnForm(c); },

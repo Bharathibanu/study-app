@@ -634,3 +634,11 @@ The multi-day Backlog recovery plan and its study-window editor have been remove
 **Log progress** now fills in the full remaining time. Save that amount to finish a lesson, or enter fewer minutes to record partial progress. The form explains the difference. A partial save leaves only the actual remaining minutes in the pending list.
 
 The save action resolves the current task by ID when you submit. A Firebase update while the form is open can replace state objects, so the form no longer writes to an outdated task reference. If another device already finished the lesson, the old form does not add duplicate study credit. Saved linked sessions also repair lost task-summary minutes/completion when the account loads or syncs; the repair uses recorded credits and study dates, preserving the logs and leaving genuinely partial work unfinished.
+
+### Editing records while sync is active
+
+To-do, book, learning-card, diary and mistake editors now resolve the latest record when saving. An unrelated cloud update no longer detaches the open form from the active account state. Only fields changed in the form are applied, so independent edits and completion flags from another device are retained.
+
+If another device changed the same field or deleted the record, the form remains open with an explanation and your draft intact. Copy the draft, then close and reopen the latest record before resolving the difference. Validation errors also keep the entered values visible.
+
+Book-page logging uses the latest reading history and caps new credit at the pages remaining. A form left open while another device finishes the book cannot add extra pages beyond the book's total.
