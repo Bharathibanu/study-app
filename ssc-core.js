@@ -221,3 +221,35 @@ export function setPlanLessonMinutes(state,minutes,today) {
   }
   return changed;
 }
+
+// Recover summary credit from saved linked sessions without inventing study minutes.
+export function repairTaskProgress(state) {
+  const totals=new Map(),dates=new Map(),seen=new Set();let changed=false;
+  for(const log of state.logs || []){
+    if(!log.task || log.id && seen.has(log.id))continue;
+    if(log.id)seen.add(log.id);
+    const credit=Number(log.credit ?? log.min);if(!Number.isFinite(credit) || credit<=0)continue;
+    totals.set(log.task,(totals.get(log.task) || 0)+credit);
+    if(validStudyDate(log.date) && log.date>(dates.get(log.task) || ''))dates.set(log.task,log.date);
+  }
+  for(const task of state.tasks || []){
+    const recorded=totals.get(task.id) || 0, previous=Number(task.spent) || 0;
+    if(recorded<=previous)continue;
+    task.spent=recorded;changed=true;
+    if(recorded>=task.plan){task.done=true;task.doneDate=task.doneDate || dates.get(task.id) || task.orig || task.date;}
+  }
+  return changed;
+}
+export function logTaskProgress(state,taskId,minutes,metadata) {
+  const task=(state.tasks || []).find(t=>t.id===taskId);
+  if(!task)return {task:null,minutes:0,reason:'missing'};
+  const remaining=Math.max(0,task.plan-task.spent);
+  if(task.done || !remaining)return {task,minutes:0,reason:'finished'};
+  if(!Number.isFinite(minutes) || minutes<=0)throw new Error('Enter positive study minutes.');
+  if(state.logs.some(l=>l.id===metadata.id))return {task,minutes:0,reason:'saved'};
+  const credit=Math.min(minutes,remaining);
+  state.logs.push({...metadata,subj:task.subj,topic:task.topic,min:credit,credit,focus:0,task:task.id});
+  task.spent+=credit;
+  if(task.spent>=task.plan){task.done=true;task.doneDate=metadata.date;}
+  return {task,minutes:credit,reason:'saved'};
+}

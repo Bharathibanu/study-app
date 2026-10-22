@@ -627,3 +627,10 @@ Completed lessons retain their historical estimates and completion dates. Actual
 
 
 The multi-day Backlog recovery plan and its study-window editor have been removed. Daily priority pins, the daily catch-up target, subject/carry filters and weekly subject review remain available. Existing plan, study logs and account data are retained.
+
+
+### Saving lesson progress reliably
+
+**Log progress** now fills in the full remaining time. Save that amount to finish a lesson, or enter fewer minutes to record partial progress. The form explains the difference. A partial save leaves only the actual remaining minutes in the pending list.
+
+The save action resolves the current task by ID when you submit. A Firebase update while the form is open can replace state objects, so the form no longer writes to an outdated task reference. If another device already finished the lesson, the old form does not add duplicate study credit. Saved linked sessions also repair lost task-summary minutes/completion when the account loads or syncs; the repair uses recorded credits and study dates, preserving the logs and leaving genuinely partial work unfinished.

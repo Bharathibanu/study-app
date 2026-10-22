@@ -5,7 +5,7 @@ import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
-import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes } from './ssc-core.js';
+import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes, repairTaskProgress, logTaskProgress } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -166,7 +166,7 @@ async function syncAccount(force = false) {
     if (remaining.conflicts.length) {
       const error = new Error('Local data changed during save.'); error.code = 'sync/conflict'; error.remote = saved; error.conflicts = remaining.conflicts; throw error;
     }
-    applyAccount(remaining.state); syncState.dirty = !sameState(S,saved);
+    applyAccount(remaining.state); const repaired=repairTaskProgress(S); if(repaired)saveDeviceCopy(); syncState.dirty = !sameState(S,saved);
     syncState.conflict = null; syncState.problem = '';
     syncState.acknowledged = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
     setSync(syncState.dirty ? 'Saved locally · syncing…' : 'Synced · server confirmed');
@@ -209,6 +209,7 @@ function dataChanged() { rollover(); genPlan(); if (!$('#app').hidden && $('#mod
 
 /* =============== Data logic =============== */
 function genPlan() {
+  const repaired=repairTaskProgress(S);
   const durationsChanged=setPlanLessonMinutes(S,lessonMinutes(S),today());
   const t = today(), have = new Set(S.tasks.map((k) => k.pk).filter(Boolean));
   let n = 0;
@@ -220,7 +221,8 @@ function genPlan() {
     S.tasks.push({ id: 'plan:' + pk, pk, orig: r.date, date: r.date, subj: r.subj, topic: r.topic, plan: r.min, spent: 0, done: false, doneDate: null });
     n++;
   });
-  if (n || durationsChanged) persist();
+  const repairedGenerated=repairTaskProgress(S);
+  if (n || durationsChanged || repaired || repairedGenerated) persist();
   return n;
 }
 // View preferences stay on this device; filtering never changes plan dates or progress.
@@ -1219,7 +1221,21 @@ const ACT = {
   addNote: () => { closeModal(); openForm('Add note', [{ k: 'tag', label: 'Tag', ph: 'Current affairs, Maths, English...' }, { k: 'text', label: 'Note', type: 'textarea', req: 1 }], 'Save note', (v) => { S.notes.push({ id: uid(), date: today(), tag: v.tag, text: v.text }); persist(); toast('Note saved'); if (CUR === 'notes') render(); }); },
   addRev: (d) => openForm('Log revision', [{ k: 'date', label: 'Date', type: 'date', value: today() }, { k: 'subj', label: 'Subject', type: 'select', options: SUBJECTS, value: d.subj || 'Quant' }, { k: 'topic', label: 'Topic', req: 1, value: d.topic || '' }, { k: 'min', label: 'Minutes spent', type: 'number', req: 1, min: 1, value: 30 }, { k: 'q', label: 'Questions practised', type: 'number', value: 0, min: 0 }, { k: 'c', label: 'Correct answers', type: 'number', value: 0, min: 0 }], 'Save', (v) => { S.rev.push({ id: uid(), date: v.date || today(), subj: v.subj, topic: v.topic, min: v.min, q: v.q || 0, c: Math.min(v.c || 0, v.q || 0) }); persist(); toast('Revision logged'); render(); }),
   addMock: () => openForm('Log mock test', [{ k: 'name', label: 'Test name', req: 1 }, { k: 'date', label: 'Date', type: 'date', value: today() }, { k: 'score', label: 'Score', type: 'number', req: 1, min: 0 }, { k: 'max', label: 'Maximum marks', type: 'number', value: 200, req: 1, min: 1 }, { k: 'mins', label: 'Minutes taken', type: 'number' }, { k: 'notes', label: 'What went wrong?', type: 'textarea' }], 'Save', (v) => { S.mocks.push({ id: uid(), name: v.name, date: v.date || today(), score: v.score, max: v.max, mins: v.mins || 0, notes: v.notes }); persist(); toast('Mock test saved'); render(); }),
-  partial: (d) => { const k = S.tasks.find((x) => x.id === d.id); if (!k) return; openForm('How much did you finish?', [{ k: 'min', label: 'Minutes completed of ' + (k.plan - k.spent) + ' left', type: 'number', req: 1, min: 1, value: Math.round((k.plan - k.spent) / 2) }], 'Save', (v) => { const m = Math.min(v.min, k.plan - k.spent); S.logs.push({ id: uid(), date: today(), at: Date.now(), subj: k.subj, topic: k.topic, min: m, focus: 0, task: k.id }); k.spent += m; if (k.spent >= k.plan) { k.done = true; k.doneDate = today(); } persist(); toast(k.done ? 'Task finished' : (k.plan - k.spent) + ' min carried forward'); render(); }); },
+  partial: d => {
+    const task=S.tasks.find(t=>t.id===d.id);
+    if(!task)return;
+    if(task.done || task.spent>=task.plan){toast('This lesson is already finished.');render();return;}
+    const remaining=task.plan-task.spent, generation=syncState.generation;
+    openForm('Log lesson progress', [{k:'min',label:'Minutes studied now ('+remaining+' min remaining)',type:'number',req:1,min:1,value:remaining}], 'Save progress', v=>{
+      if(generation!==syncState.generation){toast('Your account changed. Reopen the lesson to log progress.');return;}
+      // Look up the current task at submission: cloud updates can replace S while this form is open.
+      const result=logTaskProgress(S,d.id,v.min,{id:uid(),date:today(),at:Date.now()});
+      if(!result.task){toast('This lesson is no longer available. Reopen your schedule.');render();return;}
+      if(result.minutes)persist();
+      toast(result.task.done?'Task finished':(result.task.plan-result.task.spent)+' min still to finish');render();
+    });
+    $('#mbody').insertAdjacentHTML('afterbegin', '<p class="quiet">The full remaining time is filled in to finish this lesson. Enter fewer minutes only if you finished part of it.</p>');
+  },
   delTask: (d) => { S.tasks = S.tasks.filter((k) => k.id !== d.id); S.logs = S.logs.filter((l) => l.task !== d.id); persist(); render(); },
   doneTask: (d) => { setTaskDone(d.id, true); toast('Marked done'); render(); },
   resched: (d) => { const k = S.tasks.find((x) => x.id === d.id); if (k) { k.date = addD(today(), 1); persist(); toast('Moved to tomorrow'); render(); } },
