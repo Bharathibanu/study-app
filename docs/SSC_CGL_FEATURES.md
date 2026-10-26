@@ -66,7 +66,7 @@ Use content you own or are permitted to reproduce. Do not copy a subscription qu
 
 ## Daily recommendation list
 
-Home shows up to two due reviews, three unfinished overdue/current lessons and one weak topic. It does not alter your timetable or invent study hours. Practice opens matching topic filters; an empty result explains that a matching bank or manual practice is needed. The full schedule remains below.
+Home shows up to two due reviews, three unfinished overdue/current lessons and one weak topic. It does not alter your timetable or invent study hours. Practice opens matching topic filters; an empty result explains that a matching bank or manual practice is needed. This suggestion list is under the expandable Study suggestions section on Home; today’s schedule appears near the top.
 
 ## Firebase saving and conflict handling
 

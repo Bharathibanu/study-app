@@ -116,13 +116,13 @@ Creating a Firebase account does not automatically migrate the previous local-on
 
 ### Home
 
-Shows the greeting, date, streak, daily task percentage, study minutes, expenses, critical items, today’s schedule, meetings, compact to-dos, level and badges. The Home-only plan-tracking panel shows achievement against imported plan rows. It is not repeated on other sections.
+Starts with the greeting, date, daily study minutes, completion progress and a next-lesson card. The first pinned unfinished lesson is suggested first, followed by today’s lessons and then carried work. Today’s schedule separates current lessons, expandable carried-day groups and completed lessons. The Home-only plan-tracking panel shows achievement against imported plan rows, with an expandable subject breakdown and subject/carry filters. It is not repeated on other sections. Weekly metrics, study suggestions, critical items and money/meeting/to-do/badge details are available in expandable sections.
 
-Task checkbox: records the remaining planned minutes as manually completed. **Part** / **Log progress**: records a chosen number of minutes. Delete removes the task and linked study logs. Reschedule moves an unfinished task’s working date; its original due date still matters for overdue accounting.
+Task checkbox: records the remaining planned minutes as manually completed. **Log progress**: records a chosen number of minutes. Delete removes the task and linked study logs. Reschedule moves an unfinished task’s working date; its original due date still matters for overdue accounting.
 
 ### Study Timer
 
-Focus and break periods use configured minute lengths. Start/pause controls interval updates. Stop and save opens a session form; elapsed time is not automatically durable just because the timer ran. The form records subject, topic, minutes and focus rating.
+The Home **Continue studying** button opens the timer with the chosen lesson’s subject and topic. Its plan task is preselected when saving that timer session; extra study remains available as an explicit choice. An already active session keeps its original context. Focus and break periods use configured minute lengths. Start/pause controls interval updates. Stop and save opens a session form; elapsed time is not automatically durable just because the timer ran. The form records subject, topic, minutes and focus rating.
 
 Choose a plan topic in the session form to credit its achievement. Extra study remains a session but does not reduce a plan topic’s gap. Credited minutes are capped at the task’s remaining planned duration. Deleting a linked session subtracts its credited minutes and can reopen the task.
 
@@ -194,7 +194,7 @@ The header’s Home button and the browser/Android Back action return to Home fr
 
 ### More and Quick add
 
-Phone navigation presents a smaller primary menu; More opens secondary sections. The floating plus button opens commonly used add forms. Desktop navigation lists more sections directly.
+Phone navigation has five tabs: Home, Plan, Practice, Revise and More. Reports, Trendline, settings and other secondary sections are available under More. The floating plus button opens commonly used add forms. Desktop navigation lists more sections directly.
 
 ## 4. Plan, achievement and gap calculations
 
@@ -642,3 +642,7 @@ To-do, book, learning-card, diary and mistake editors now resolve the latest rec
 If another device changed the same field or deleted the record, the form remains open with an explanation and your draft intact. Copy the draft, then close and reopen the latest record before resolving the difference. Validation errors also keep the entered values visible.
 
 Book-page logging uses the latest reading history and caps new credit at the pages remaining. A form left open while another device finishes the book cannot add extra pages beyond the book's total.
+
+### Expandable Home sections
+
+Lesson menus hold Pin today, Practice and Remove task. Log progress stays visible on each unfinished card. Native details/summary controls can be opened with touch, mouse or keyboard. Open/closed choices survive in-app rerenders and section navigation in the current session; they reset on reload and are never stored in the Firebase study record. Filtering a subject or carry age opens matching backlog groups by default. Light/dark themes and reduced-motion preferences apply to the new layout.

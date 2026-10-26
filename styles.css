@@ -1,5 +1,5 @@
 [hidden] { display: none !important; }
-/* Layout: login > welcome > app shell (sidebar on desktop, bottom bar on phone) with five views: Home, Trendline, Revision, Reports, Tricks */
+/* Layout: login > welcome > app shell (sidebar on desktop, bottom bar on phone) with Home, Plan, Practice and Revise as primary views */
 :root{
   --bg:#F2F5F1; --surface:#FFFEFA; --surface2:#E7EFEB; --ink:#12231F; --muted:#586964; --line:#CFD9D5;
   --teal:#0E6B5B; --teal-ink:#FFFFFF; --accent:#B98727; --accent-ink:#2A1C00;
@@ -412,3 +412,86 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 .revision-item small{display:block;margin:8px 0;color:var(--muted);line-height:1.6}
 .revision-item .actions{margin-top:8px}
 @media(max-width:700px){.revision-stages{grid-template-columns:1fr}}
+
+/* Daily study workspace: clear hierarchy, optional detail and comfortable touch targets. */
+.main{max-width:1180px;margin-inline:auto}
+.home-layout{display:grid;gap:20px}
+.home-layout>.card{margin-bottom:0!important}
+.home-layout h3{font-size:20px}
+.home-today{background:linear-gradient(115deg,var(--surface),color-mix(in srgb,var(--teal) 6%,var(--surface)));padding:24px}
+.today-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.home-today #today-heading{font-size:clamp(24px,4vw,32px);margin:5px 0 4px}
+.streak-pill{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;font-size:12px;font-weight:600;color:var(--muted);background:var(--surface);padding:7px 10px;border:1px solid var(--line);border-radius:99px}
+.streak-pill svg{width:18px;height:18px}
+.today-metrics{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:22px 0 16px}
+.today-metrics>div+div{border-left:1px solid var(--line);padding-left:20px}
+.today-metrics b{display:block;font-family:var(--f-display);font-size:32px;color:var(--teal);line-height:1.2}
+.today-metrics small{font-size:18px;color:var(--muted);font-weight:500}
+.today-metrics span{display:block;color:var(--muted);font-size:13px;margin-top:4px}
+.next-lesson{border-color:color-mix(in srgb,var(--teal) 45%,var(--line));border-left:4px solid var(--teal);padding:24px;background:linear-gradient(110deg,color-mix(in srgb,var(--teal) 6%,var(--surface)),var(--surface))}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:700;color:var(--teal)}
+.next-lesson h3{font-size:26px;margin:8px 0!important;overflow-wrap:anywhere}
+.next-lesson p{color:var(--muted);font-size:14px}
+.next-lesson .actions{margin-top:20px}
+.section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
+.section-heading h3{margin:0 0 4px}
+.section-heading>.btn{flex-shrink:0}
+.lesson-list{display:grid;gap:12px}
+.trow.lesson-card{display:block;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);transition:border-color .18s,background-color .18s}
+.lesson-card .task{padding:0;gap:12px;align-items:flex-start}
+.lesson-card .tick{margin-top:16px;width:25px;height:25px;flex-shrink:0}
+.lesson-card .task .t b{font-size:17px;margin:3px 0;line-height:1.4;overflow-wrap:anywhere}
+.lesson-card .task .t span{display:block}
+.lesson-card .task .t .lesson-subject{color:var(--teal);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.lesson-footer{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin:14px 0 0 37px}
+.lesson-menu{min-width:44px}
+.lesson-menu>summary{list-style:none;display:flex;justify-content:center;align-items:center;min-height:44px;min-width:44px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.lesson-menu>summary::-webkit-details-marker{display:none}
+.lesson-menu[open]{flex:1;display:flex;flex-direction:column;align-items:flex-end}
+.lesson-menu .actions{justify-content:flex-end;margin-top:10px}
+.lesson-complete{background:var(--surface2)!important}
+.lesson-complete .task .t b{color:var(--muted)}
+.schedule-group{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+.schedule-group>summary{cursor:pointer;padding:8px 0;min-height:44px;overflow-wrap:anywhere}
+.schedule-group>summary .quiet{display:block;margin:4px 0 4px 18px;font-size:13px}
+.schedule-group .lesson-card{margin-top:10px}
+.timer-link{display:inline-flex;gap:8px;align-items:center;margin-top:18px}
+.revision-shortcut{display:flex;align-items:center;gap:14px;padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--teal);text-align:left;width:100%;transition:border-color .18s}
+.revision-shortcut>span:first-of-type{flex:1;min-width:0}
+.revision-shortcut small{display:block;color:var(--muted);margin-top:4px;font-size:12px;line-height:1.5}
+.revision-shortcut:hover{border-color:var(--teal)}
+.fold-card{padding:0;box-shadow:none}
+.fold-card>summary{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px;cursor:pointer;list-style:none;min-height:64px}
+.fold-card>summary::-webkit-details-marker{display:none}
+.fold-card>summary h3{font-size:16px;margin:0 0 3px}
+.fold-chevron{font-size:24px;color:var(--muted);transition:transform .2s}
+.fold-card[open]>summary .fold-chevron{transform:rotate(180deg)}
+.fold-body{padding:0 18px 18px}
+.fold-body>p{margin-bottom:12px}
+.home-secondary{display:grid;gap:14px}
+.home-secondary>.card{margin:0!important}
+.home-layout .stat{padding:14px;border-top:0;background:var(--surface2);border-color:transparent}
+.home-layout .stat b{font-size:26px;margin-top:6px}
+.home-layout .stat .label{font-size:10px;letter-spacing:.06em}
+.home-layout .stat small{font-size:12px}
+.home-layout .card>.fold-card{margin-top:16px;background:transparent}
+.plan-status{margin:14px 0}
+#plan-backlog{border-top:1px solid var(--line);padding-top:18px;margin-top:18px}
+#backlog-title{font-family:var(--f-display);font-size:18px;margin:0 0 6px}
+.backlog-group{padding:0;background:var(--surface)}
+.backlog-group>summary{padding:16px;min-height:52px}
+.backlog-group>summary .quiet{display:block;margin-top:5px;font-size:12px}
+.backlog-group .backlog-row{margin:0 16px;padding:18px 0}
+.backlog-group .backlog-row:last-child{padding-bottom:18px}
+.backlog-filters .label{display:block;margin-bottom:6px}
+.backlog-row b{font-size:16px}
+.backlog-row .badge.amber{color:var(--ink);background:color-mix(in srgb,var(--accent) 22%,var(--surface))}
+.home-layout .quote{font-size:14px;text-align:center;padding:10px 16px}
+.btn.sm,.mini{min-height:44px}
+.icon-btn{width:44px;height:44px}
+@media(min-width:1000px){.home-layout{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.home-layout>*{grid-column:1/-1}.home-today,.next-lesson{grid-column:auto;align-self:stretch}.home-secondary{grid-template-columns:repeat(2,minmax(0,1fr))}.home-secondary>.card:first-child{grid-row:span 2}}
+@media(max-width:859px){.side{gap:3px;padding-inline:10px;background:var(--surface);box-shadow:0 -4px 20px rgba(8,45,37,.04)}.side .nav{min-height:56px;font-size:11px;border-radius:14px}.side .nav[aria-current=page]{box-shadow:none}.side .nav svg{width:23px;height:23px}.main{padding:18px 16px 110px}.top{gap:8px;margin-bottom:18px}.tools{gap:6px}.tools .pill{font-size:10px;max-width:175px}.top h2{font-size:26px}.home-layout{gap:16px}.home-today,.next-lesson{padding:20px}.home-layout .card{border-radius:18px}.home-today .today-heading{flex-wrap:wrap}.streak-pill{padding:5px 8px}.today-metrics{margin-top:18px}.home-layout>.card>.stats{gap:10px}.home-layout .backlog-filters{grid-template-columns:1fr 1fr;gap:10px}.backlog-filters>div:last-child{grid-column:1/-1}.home-layout .backlog-filters .inp{font-size:14px;padding:11px 10px}.home-layout .backlog-row .actions{width:100%}.home-layout .backlog-row .actions .btn:first-child{flex:1}.home-layout .priority-list{font-size:14px}.next-lesson .actions .btn:first-child{flex:1}.fab{width:48px;height:48px;right:14px}}
+@media(max-width:360px){.main{padding-inline:12px}.home-today,.next-lesson,.schedule-card{padding:16px}.today-metrics b{font-size:28px}.next-lesson .actions{flex-direction:column}.today-heading .label{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.fold-chevron,.lesson-card,.revision-shortcut{transition:none}}
+@media(min-width:1000px){.lesson-list{grid-template-columns:repeat(2,minmax(0,1fr))}.next-lesson{display:flex;flex-direction:column;justify-content:center}.next-lesson .actions{margin-top:24px}}
+@media(max-width:600px){.next-lesson .actions{display:grid;grid-template-columns:1fr}.next-lesson .actions .btn{width:100%}.next-lesson .actions .btn.ghost{border-color:transparent;background:transparent;box-shadow:none}}

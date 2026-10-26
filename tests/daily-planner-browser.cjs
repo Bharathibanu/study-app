@@ -20,6 +20,8 @@ const {chromium}=require('playwright');const assert=require('assert/strict');con
   const priority=page.locator('.card').filter({has:page.getByRole('heading',{name:'My three priorities today',exact:true})});
   const catchup=page.locator('.card').filter({has:page.getByRole('heading',{name:'Daily catch-up target',exact:true})});
   const weekly=page.locator('.card').filter({has:page.getByRole('heading',{name:'Weekly subject review',exact:true})});
+  await list.locator('.backlog-group').evaluateAll(rows=>rows.forEach(row=>row.open=true));
+  await catchup.locator('summary').first().click();
   for(let i=0;i<3;i++)await list.getByRole('button',{name:'Pin today',exact:true}).first().click();
   assert.equal(await priority.locator('li').count(),3);await list.getByRole('button',{name:'Pin today',exact:true}).first().click();assert.equal(await priority.locator('li').count(),3);
   await priority.getByRole('button',{name:'Unpin',exact:true}).first().click();assert.equal(await priority.getByRole('button',{name:'Unpin',exact:true}).count(),2);
@@ -29,6 +31,7 @@ const {chromium}=require('playwright');const assert=require('assert/strict');con
   // Seed weekly attempts with known weighted accuracy/speed; add no study hours.
   await page.evaluate(()=>{const key='sst_state_local',s=JSON.parse(localStorage.getItem(key)),date=s.logs.at(-1).date;s.practice=[{id:'weekly-a',subj:'Quant',topic:'Test',date,attempted:10,correct:8,seconds:200},{id:'weekly-b',subj:'Quant',topic:'Test',date,attempted:10,correct:4,seconds:0}];localStorage.setItem(key,JSON.stringify(s));});
   await page.reload();await priority.waitFor();assert.equal(await priority.getByRole('button',{name:'Unpin',exact:true}).count(),2);assert.match(await catchup.textContent(),/Catch-up target: 45 min/);
+  await weekly.locator('summary').first().click();
   const quant=weekly.locator('tbody tr').filter({has:page.getByRole('cell',{name:'Quant',exact:true})});assert.match(await quant.textContent(),/60.0%/);assert.equal(await quant.locator('td').last().textContent(),'20.0');
   await page.evaluate(()=>navigator.serviceWorker.ready);await page.context().setOffline(true);await page.reload();await priority.waitFor();assert.equal(await priority.getByRole('button',{name:'Unpin',exact:true}).count(),2);assert.match(await catchup.textContent(),/Catch-up target: 45 min/);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);await page.context().setOffline(false);

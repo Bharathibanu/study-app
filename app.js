@@ -5,7 +5,7 @@ import * as cloud from './cloud.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
-import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes, repairTaskProgress, logTaskProgress, applyRecordEdit, logBookPages } from './ssc-core.js';
+import { clone, sameState, mergeStates, dailyFocusSummary, weeklySubjectReview, postponePlan, validateBackup, validStudyDate, validatePlanRows, lessonMinutes, setPlanLessonMinutes, repairTaskProgress, logTaskProgress, applyRecordEdit, logBookPages, revisionQueue } from './ssc-core.js';
 
 /* =============== Helpers =============== */
 const $ = (s, r = document) => r.querySelector(s);
@@ -68,13 +68,13 @@ const ICON = {
 
 const NAV = [
   { id: 'home', label: 'Home', prim: 1 },
-  { id: 'trend', label: 'Trendline', prim: 1 },
+  { id: 'plan', label: 'SSC Plan', short: 'Plan', prim: 1 },
+  { id: 'practice', label: 'Topic Practice', short: 'Practice', prim: 1 },
   { id: 'rev', label: 'Quick Revision', short: 'Revise', prim: 1 },
-  { id: 'rep', label: 'Reports', prim: 1 },
+  { id: 'trend', label: 'Trendline' },
+  { id: 'rep', label: 'Reports' },
   { id: 'study', label: 'Study Timer' },
   { id: 'revlog', label: 'Revision Log' },
-  { id: 'plan', label: 'SSC Plan' },
-  { id: 'practice', label: 'Topic Practice' },
   { id: 'mistakes', label: 'Mistake Notebook' },
   { id: 'revisionQueue', label: 'Revision Queue' },
   { id: 'mockAnalysis', label: 'CGL Mock Analysis' },
@@ -226,7 +226,11 @@ function genPlan() {
   return n;
 }
 // View preferences stay on this device; filtering never changes plan dates or progress.
-const backlogView = { subject: '', age: '', group: 'age' };
+const backlogView = { subject: '', age: '', group: 'subject' };
+// Disclosure choices are presentation only; never write them into synced study data.
+const disclosureState = new Map();
+const disclosureOpen = (key, fallback = false) => (disclosureState.get(key) ?? fallback) ? ' open' : '';
+const foldCard = (title, body, key, hint = '') => `<details class="card fold-card" data-disclosure="${esc(key)}"${disclosureOpen(key)}><summary><div><h3>${esc(title)}</h3>${hint ? `<span class="quiet">${esc(hint)}</span>` : ''}</div><span class="fold-chevron" aria-hidden="true">⌄</span></summary><div class="fold-body">${body}</div></details>`;
 const focusPrefs = () => { S.dailyFocus ||= {}; return S.dailyFocus[today()] ||= {pins: []}; };
 function pinButton(id) {
   const pinned=(S.dailyFocus?.[today()]?.pins || []).includes(id);
@@ -247,25 +251,25 @@ function backlogHTML(pending) {
   const entries = [...groups].sort((a,b) => backlogView.group === 'subject' ? a[0].localeCompare(b[0]) : b[0]-a[0]);
   const options = (values, current, label) => values.map(v => `<option value="${esc(v)}"${String(v) === current ? ' selected' : ''}>${esc(label(v))}</option>`).join('');
   return `<section id="plan-backlog" aria-labelledby="backlog-title"><h4 id="backlog-title">Next work to finish</h4>
-    <p class="quiet">Choose a subject or the number of calendar days carried from the original plan date. Oldest work comes first within each group. Over 3 days is critical.</p>
+    <p class="quiet">Open a group to choose your next lesson. Oldest work comes first; over 3 days carried is critical.</p>
     <div class="backlog-filters">
       <div><label class="label" for="backlog-subject">Subject</label><select class="inp" id="backlog-subject" data-chg="backlogFilter" data-key="subject"><option value="">All subjects</option>${options(subjects, backlogView.subject, v=>v)}</select></div>
       <div><label class="label" for="backlog-age">Days carried</label><select class="inp" id="backlog-age" data-chg="backlogFilter" data-key="age"><option value="">All days</option>${options(ages, backlogView.age, carryLabel)}</select></div>
       <div><label class="label" for="backlog-group">Group by</label><select class="inp" id="backlog-group" data-chg="backlogFilter" data-key="group">${options(['age','subject'], backlogView.group, v=>v==='age'?'Days carried':'Subject')}</select></div>
     </div>
     <p class="quiet" role="status">${selected.length} of ${pending.length} pending lessons · ${sum(selected,r=>r.gap)} min left. Achievement totals above include all subjects.</p>
-    ${entries.map(([key,rows])=>`<details class="backlog-group" open><summary>${esc(backlogView.group==='subject'?key:carryLabel(key))} <span class="quiet">· ${rows.length} lessons · ${sum(rows,r=>r.gap)} min left</span></summary>
+    ${entries.map(([key,rows])=>`<details class="backlog-group" data-disclosure="${esc('backlog:'+backlogView.group+':'+key+':'+backlogView.subject+':'+backlogView.age)}"${disclosureOpen('backlog:'+backlogView.group+':'+key+':'+backlogView.subject+':'+backlogView.age,!!backlogView.subject || backlogView.age!=='')}><summary>${esc(backlogView.group==='subject'?key:carryLabel(key))} <span class="quiet">· ${rows.length} lessons · ${sum(rows,r=>r.gap)} min left</span></summary>
       ${rows.map(r=>{const age=diff(r.date,today());return `<article class="backlog-row"><div><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>Plan day ${esc(r.day)} · ${fmtD(r.date)} · ${r.gap} min left</small><span class="badge${age?' amber':''}">${carryLabel(age)}${age>3?' · Critical':''}</span></div>${r.task?`<div class="actions"><button class="btn sm ghost" data-act="partial" data-id="${esc(r.task.id)}">Log progress</button>${pinButton(r.task.id)}</div>`:''}</article>`;}).join('')}</details>`).join('') || '<p class="quiet">No pending lessons match these filters. Choose All subjects and All days to see the full list.</p>'}
     </section>`;
 }
 function dailyPlannerHTML() {
   const f = dailyFocusSummary(S,today()), week=weeklySubjectReview(S,today());
   const priorities = f.pins.map(r=>`<li><b>${esc(r.subj)} · ${esc(r.topic)}</b><small>${r.gap} min left</small><div class="actions">${pinButton(r.id)}<button class="btn sm" data-act="partial" data-id="${esc(r.id)}">Log progress</button></div></li>`).join('');
-  return card('My three priorities today', `<p class="quiet">Pin up to three unfinished lessons using “Pin today” in the plan list or schedule. Pins are for this date and sync to your account.</p><ol class="priority-list">${priorities || '<li>No priorities pinned yet.</li>'}</ol>`, ' style="margin-bottom:14px"') +
-    card('Daily catch-up target', `<p>${f.available===null?'Set your remaining study time for today.':`Remaining time set: <b>${f.available} min</b>. Today’s unfinished plan: <b>${f.todayMinutes} min</b>. Overdue plan: <b>${f.backlog} min</b>.`}</p><button class="btn sm ghost" data-act="catchupTime">Set remaining time</button>
+  return card('My three priorities today', `<p class="quiet">Choose up to three lessons with “Pin today”.</p><ol class="priority-list">${priorities || '<li>No priorities pinned yet.</li>'}</ol>`, ' style="margin-bottom:14px"') +
+    foldCard('Daily catch-up target', `<p>${f.available===null?'Set your remaining study time for today.':`Remaining time set: <b>${f.available} min</b>. Today’s unfinished plan: <b>${f.todayMinutes} min</b>. Overdue plan: <b>${f.backlog} min</b>.`}</p><button class="btn sm ghost" data-act="catchupTime">Set remaining time</button>
     ${f.available===null?'':`<p role="status">Catch-up target: <b>${f.target} min</b>${f.shortfall?` · Today’s plan exceeds your remaining time by ${f.shortfall} min.`:'.'}</p><p class="quiet">Today’s plan gets time first; the remaining time goes to overdue lessons. Pinned overdue lessons come first, then oldest work. This is a suggestion; it does not move dates or record study time. Update remaining time as your day changes. Extra tasks and revision need their own time allowance.</p>
-    <ul class="priority-list">${f.chunks.map(r=>`<li>${esc(r.subj)} · ${esc(r.topic)} <b>${r.minutes} min${r.minutes<r.gap?' (part of lesson)':''}</b></li>`).join('') || '<li>No catch-up work fits this time allowance.</li>'}</ul>`}`, ' style="margin-bottom:14px"') +
-    card('Weekly subject review', `<p class="quiet">${fmtD(week.since)}–${fmtD(today())} (last 7 days). Study and questions use this period. Backlog shows all overdue plan lessons as of today. Accuracy uses attempted questions; speed uses timed attempts only.</p><div class="tablewrap"><table><thead><tr><th>Subject</th><th>Study</th><th>Backlog</th><th>Attempted</th><th>Accuracy</th><th>Seconds / question</th></tr></thead><tbody>${week.rows.map(r=>`<tr><td>${esc(r.subj)}</td><td>${r.minutes} min</td><td>${r.backlogTopics} lessons · ${r.backlogMinutes} min</td><td>${r.attempted}</td><td>${r.accuracy===null?'No attempts':r.accuracy.toFixed(1)+'%'}</td><td>${r.seconds===null?'Not timed':r.seconds.toFixed(1)}</td></tr>`).join('') || '<tr><td colspan="6">No study, question attempts or plan backlog yet.</td></tr>'}</tbody></table></div>`, ' style="margin-bottom:14px"');
+    <ul class="priority-list">${f.chunks.map(r=>`<li>${esc(r.subj)} · ${esc(r.topic)} <b>${r.minutes} min${r.minutes<r.gap?' (part of lesson)':''}</b></li>`).join('') || '<li>No catch-up work fits this time allowance.</li>'}</ul>`}`, 'catchup', f.available===null?'Optional · set the time you have left':`${f.target} min catch-up target`) +
+    foldCard('Weekly subject review', `<p class="quiet">${fmtD(week.since)}–${fmtD(today())} (last 7 days). Study and questions use this period. Backlog shows all overdue plan lessons as of today. Accuracy uses attempted questions; speed uses timed attempts only.</p><div class="tablewrap"><table><thead><tr><th>Subject</th><th>Study</th><th>Backlog</th><th>Attempted</th><th>Accuracy</th><th>Seconds / question</th></tr></thead><tbody>${week.rows.map(r=>`<tr><td>${esc(r.subj)}</td><td>${r.minutes} min</td><td>${r.backlogTopics} lessons · ${r.backlogMinutes} min</td><td>${r.attempted}</td><td>${r.accuracy===null?'No attempts':r.accuracy.toFixed(1)+'%'}</td><td>${r.seconds===null?'Not timed':r.seconds.toFixed(1)}</td></tr>`).join('') || '<tr><td colspan="6">No study, question attempts or plan backlog yet.</td></tr>'}</tbody></table></div>`, 'weekly', 'Study time, accuracy and speed by subject');
 }
 function planTracking() {
   if (!S.plan.length) return card('Plan tracking', '<p class="quiet">Load your SSC plan to track achievement, gaps and warnings.</p>');
@@ -284,10 +288,10 @@ function planTracking() {
     <div class="stat"><span class="label">Achieved</span><b>${hrs(achieved)} h</b><small>${planned ? Math.round(achieved / planned * 100) : 0}% of due work</small></div>
     <div class="stat"><span class="label">Remaining gap</span><b>${hrs(gap)} h</b></div>
     <div class="stat"><span class="label">Overdue topics</span><b>${overdue.length}</b><small>${overdue.filter(r => diff(r.date,t)>3).length} critical (over 3 days)</small></div>
-  </div><p class="quiet">Achievement counts minutes recorded against plan tasks, including manual completion. Extra study, revision drills and mock scores remain separate. Future work and skipped dates are excluded from the gap.</p>
-  ${overdue.length ? `<p class="err" role="status">Warning: ${overdue.length} overdue topics; ${hrs(sum(overdue,r=>r.gap))} hours to catch up.</p>` : `<p class="quiet">${gap ? 'Today’s plan is still in progress.' : due.length ? 'All work due so far is achieved.' : 'Your plan has not started yet.'}</p>`}
+  </div>${foldCard('Subject breakdown', `<p class="quiet">Achievement counts minutes recorded against plan tasks, including manual completion. Extra study, revision drills and mock scores remain separate. Future work and skipped dates are excluded from the gap.</p>
   <div class="tablewrap"><table><thead><tr><th>Subject</th><th>Planned</th><th>Achieved</th><th>Gap</th></tr></thead><tbody>${subjects.map(subj=>{const group=due.filter(r=>r.subj===subj);return `<tr><td>${esc(subj)}</td><td>${hrs(sum(group,r=>r.min))} h</td><td>${hrs(sum(group,r=>r.achieved))} h</td><td>${hrs(sum(group,r=>r.gap))} h</td></tr>`;}).join('')}</tbody></table></div>
-  ${backlogHTML(pending)}`, ' style="margin-bottom:14px"');
+  `, 'subject-breakdown', 'Planned, achieved and remaining time')}
+  <p class="plan-status quiet">${overdue.length ? `${overdue.length} overdue lessons · ${hrs(sum(overdue,r=>r.gap))} h remaining` : gap ? 'Today’s plan is still in progress.' : due.length ? 'All work due so far is achieved.' : 'Your plan has not started yet.'}</p>${backlogHTML(pending)}`, ' style="margin-bottom:14px"');
 }
 function rollover() {
   const t = today(); let ch = false;
@@ -484,6 +488,7 @@ window.addEventListener('popstate', event => {
   show(view, true);
 });
 function render() {
+  $$('#view details[data-disclosure]').forEach(el => disclosureState.set(el.dataset.disclosure, el.open));
   const secIds = NAV.filter((n) => !n.prim).map((n) => n.id);
   $$('.nav').forEach((b) => {
     const on = b.dataset.v === CUR || (b.dataset.v === 'more' && (CUR === 'more' || secIds.includes(CUR)));
@@ -492,7 +497,7 @@ function render() {
   $('#vtitle').textContent = TITLES[CUR] || '';
   $('#backHome').hidden = CUR === 'home';
   const fn = VIEWS[CUR] || VIEWS.home;
-  $('#view').innerHTML = `<div class="view">${syncBanner()}${CUR === 'home' ? planTracking() : ''}${CUR === 'home' ? dailyPlannerHTML() + ssc.dailyHTML() : ''}${fn()}</div>`;
+  $('#view').innerHTML = `<div class="view">${syncBanner()}${fn()}</div>`;
   const after = AFTER[CUR]; if (after) after();
 }
 const AFTER = {};
@@ -510,66 +515,49 @@ const card = (title, body, extra) => `<div class="card"${extra || ''}>${title ? 
 
 const VIEWS = {};
 
+// A lesson has one prominent progress action; optional actions stay in its menu.
+function lessonCard(k) {
+  const left = Math.max(0,k.plan-k.spent), age = carried(k);
+  return `<article class="trow lesson-card${k.done?' lesson-complete':''}"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${esc(k.id)}"${k.done?' checked':''} aria-label="${esc((k.done?'Reopen ':'Complete ')+k.topic)}"><span class="tick">${ICON.chk}</span><span class="t"><span class="lesson-subject">${esc(k.subj)}</span><b>${esc(k.topic)}</b><span>${k.done?'Completed':`${left} min left · ${age?carryLabel(age):'Today'}`}</span></span></label>
+    <div class="lesson-footer">${k.done?'<span class="badge">Achieved ✓</span>':`<button class="btn sm" data-act="partial" data-id="${esc(k.id)}">Log progress</button>`}<details class="lesson-menu"><summary aria-label="More actions for ${esc(k.topic)}">${ICON.more}</summary><div class="actions">${k.done?'':pinButton(k.id)}<button class="btn sm ghost" data-act="sscTopicPractice" data-topic="${esc(k.topic)}" data-subj="${esc(k.subj)}">Practice</button><button class="btn sm ghost" data-act="delTask" data-id="${esc(k.id)}">Remove task</button></div></details></div></article>`;
+}
 VIEWS.home = function () {
-  const t = today(), tk = todayTasks(), done = tk.filter((k) => k.done).length, pct = tk.length ? Math.round(done / tk.length * 100) : 0;
-  const crit = critItems(), mins = sum(S.logs.filter((l) => l.date === t), (l) => l.min);
-  const spent = daySpend(t), meets = S.meet.filter((m) => m.date === t).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-  const mkey = t.slice(0, 7), mspent = monthSpend(mkey), bud = +S.settings.budget || 0;
-  const g = gamify(), st = streak(), missed = qrMissed();
-  const hr = new Date().getHours(), greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
-  let planHtml = `<div class="plan"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">200-day plan</span><button class="link" style="width:auto;padding:0;font-size:13px" data-act="nav" data-v="plan">Upload plan</button></div><div class="bar warnbar"><i style="width:0"></i></div></div>`;
-  if (S.plan.length) {
-    const total = Math.max(...S.plan.map((r) => r.day)), cur = Math.max(0, ...S.plan.filter((r) => r.date <= t).map((r) => r.day));
-    planHtml = `<div class="plan"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">SSC plan</span><span class="mono" style="font-size:13px">Day ${cur} / ${total}</span></div><div class="bar warnbar"><i style="width:${Math.round(cur / total * 100)}%"></i></div></div>`;
-  }
-  const exam = S.settings.exam ? diff(t, S.settings.exam) : null;
-  const examTxt = exam == null ? '' : exam >= 0 ? `<span class="quiet">${exam} days to exam</span>` : `<span class="quiet">Exam date passed</span>`;
-
-  const critHtml = crit.length ? `<div class="card critical"><h3>${ICON.alert}Critical zone: needs attention</h3>${crit.map((c) => c.type === 'qr'
-    ? `<div class="crit-item"><div><b>Quick Revision</b><br><span class="quiet">No drill for ${c.days} days in a row</span></div><div class="actions"><span class="badge">Missed ${c.days} days</span><button class="btn sm" data-act="nav" data-v="rev">Practise now</button></div></div>`
-    : `<div class="crit-item"><div><b>${esc(c.k.subj)}</b><br><span class="quiet">${esc(c.k.topic)} · ${c.k.plan - c.k.spent} min left</span></div><div class="actions"><span class="badge">Pending for ${c.days} days</span><button class="btn sm" data-act="doneTask" data-id="${esc(c.k.id)}">Mark done</button><button class="btn sm ghost" data-act="resched" data-id="${esc(c.k.id)}">Reschedule</button></div></div>`).join('')}<p class="quiet" style="margin-top:8px">Anything carried forward for more than 3 days lands here.</p></div>` : '';
-  const warn = missed === 1 ? `<div class="warnbanner">${ICON.warn}<div><b>You skipped Quick Revision yesterday.</b><br><span class="quiet">Two missed days move it to the Critical Zone. Do a 15-question set today to keep the streak.</span></div><button class="btn sm" data-act="nav" data-v="rev">Practise</button></div>` : '';
-
-  const taskRows = tk.length ? tk.map((k) => {
-    const c = carried(k), tag = !k.done && c ? `<span class="badge amber" style="margin-left:6px">${c === 1 ? 'Carried from yesterday' : 'Carried ' + c + ' days'}</span>` : '';
-    const left = k.plan - k.spent, partial = !k.done && k.spent > 0 ? ` · ${left} min left` : '';
-    return `<div class="trow"><label class="task"><input type="checkbox" data-chg="toggleTask" data-id="${esc(k.id)}"${k.done ? ' checked' : ''}><span class="tick">${ICON.chk}</span><span class="t"><b>${esc(k.subj)}${tag}</b><span>${esc(k.topic)}${partial}</span></span><span class="m">${esc(k.plan)} min</span></label>${k.done ? '' : pinButton(k.id)}${k.done ? '' : `<button class="mini" data-act="partial" data-id="${esc(k.id)}" title="Log part of this task" aria-label="Log part done">Part</button>`}<button class="mini" data-act="sscTopicPractice" data-topic="${esc(k.topic)}" data-subj="${esc(k.subj)}">Practice</button><button class="mini del" data-act="delTask" data-id="${esc(k.id)}" title="Remove" aria-label="Remove task">&times;</button></div>`;
-  }).join('') : `<div class="empty"><b>Nothing planned for today</b>Add a task, or upload your 200-day plan so each day fills in by itself.<div class="actions" style="justify-content:center;margin-top:10px"><button class="btn sm" data-act="addTask">Add task</button><button class="btn sm ghost" data-act="nav" data-v="plan">Upload plan</button></div></div>`;
-
-  const cT = cTotal(t);
-  const exRows = S.exp.filter((e) => e.date === t).map((e) => `<div class="exp"><span>${esc(e.note || e.cat)} <span class="quiet">${esc(e.cat)}</span></span><span class="mono">${inr(e.amt)}</span></div>`).join('') + (cT ? `<div class="exp"><span>DHANAM Canteen <span class="quiet">tea, snacks, lunch</span></span><span class="mono">${inr(cT)}</span></div>` : '') || '<p class="quiet">No expenses added today.</p>';
-  const mtRows = meets.map((m) => `<div class="exp"><span>${esc(m.title)}${m.who ? ` <span class="quiet">with ${esc(m.who)}</span>` : ''}</span><span class="mono">${esc(m.time || '')}</span></div>`).join('') || '<p class="quiet">No meetings today.</p>';
-
-  return `<div class="grid" style="gap:14px">
-  <div class="card hero"><div>
-    <p class="label">${longD(t)}</p>
-    <h3 style="font-size:clamp(26px,5vw,36px);margin:4px 0 10px">${greet}, ${esc(S.name || 'there')}</h3>
-    <div class="streak">${ICON.flame}<div><b class="mono" style="font-size:20px">${st}</b> day streak<br><span class="quiet">Best: ${bestStreak()} days ${examTxt ? '· ' : ''}</span>${examTxt}</div></div>
-    ${planHtml}
-  </div>
-  <div class="ringwrap"><svg width="132" height="132" viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="56" fill="none" stroke="var(--surface2)" stroke-width="12"/><circle id="ring" cx="66" cy="66" r="56" fill="none" stroke="var(--teal)" stroke-width="12" stroke-linecap="round" stroke-dasharray="351.86" stroke-dashoffset="351.86" data-pct="${pct}" style="transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)"/></svg><div class="rc"><div><b>${pct}%</b><br><small>of today</small></div></div></div></div>
-  <p class="quote">${esc(S.settings.why ? 'My why: ' + S.settings.why : QUOTES[(parseD(t).getDate() + parseD(t).getMonth()) % QUOTES.length])}</p>
-  ${remBanner()}${warn}${critHtml}
-  <div class="stats">
-    <div class="stat"><span class="label">Studied today</span><b>${hrs(mins)} h</b><small>target ${S.settings.target} h</small></div>
-    <div class="stat"><span class="label">Tasks done</span><b>${done} / ${tk.length}</b><small>${tk.length - done} left</small></div>
-    <div class="stat"><span class="label">Spent today</span><b>${inr(spent)}</b><small>${bud ? Math.round(mspent / bud * 100) + '% of month' : 'set a budget'}</small></div>
-    <div class="stat"><span class="label">Overdue</span><b style="color:${crit.length ? 'var(--bad)' : 'inherit'}">${crit.length}</b><small>in critical zone</small></div>
-  </div>
-  <div class="grid g2">
-    ${card("Today's schedule", taskRows + `<div class="actions" style="margin-top:12px"><button class="btn sm" data-act="addTask">Add task</button><button class="btn sm ghost" data-act="nav" data-v="study">Start focus timer</button></div>`)}
-    <div class="grid" style="gap:14px">
-      ${card('Money today', exRows + `<div class="exp"><b>Total</b><b class="mono">${inr(spent)}</b></div>` + (bud ? `<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span class="label">Month budget</span><span class="mono" style="font-size:13px">${inr(mspent)} / ${inr(bud)}</span></div><div class="bar ${mspent > bud ? 'bad' : ''}"><i style="width:${Math.min(100, Math.round(mspent / bud * 100))}%"></i></div></div>` : ''))}
-      ${card('Meetings today', mtRows)}
-      ${todoCompact()}
-      ${card('Level and badges', `<div class="xp"><div class="lv">${g.level}</div><div style="flex:1"><div class="label">Level · ${g.xp} XP</div><div class="bar" style="margin-top:6px"><i style="width:${g.pct}%"></i></div></div></div><div class="badgeRow">${g.badges.map((b) => `<div class="bdg ${b[1] ? 'on' : 'off'}"><b>${b[1] ? '&#9733;' : '&#9734;'}</b>${esc(b[0])}</div>`).join('')}</div>`)}
-    </div>
-  </div></div>`;
+  const t=today(), tk=todayTasks(), done=tk.filter(k=>k.done), pending=tk.filter(k=>!k.done);
+  const current=pending.filter(k=>!carried(k)), overdue=pending.filter(k=>carried(k));
+  const mins=sum(S.logs.filter(l=>l.date===t),l=>l.min), focus=dailyFocusSummary(S,t);
+  const next=S.tasks.find(k=>k.id===focus.pins[0]?.id) || current[0] || overdue[0];
+  const reviews=revisionQueue(S,t).filter(r=>r.isDue).length;
+  const pct=tk.length?Math.round(done.length/tk.length*100):0;
+  const hour=new Date().getHours(), greet=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
+  const activeDay=Math.max(0,...S.plan.filter(r=>r.date<=t).map(r=>r.day));
+  const spent=daySpend(t), meets=S.meet.filter(m=>m.date===t).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  const g=gamify(), crit=critItems(), missed=qrMissed();
+  const exam=S.settings.exam?diff(t,S.settings.exam):null;
+  const attention=crit.map(c=>c.type==='qr'?`<div class="crit-item"><div><b>Quick Revision</b><p class="quiet">No drill for ${c.days} days</p></div><button class="btn sm" data-act="nav" data-v="rev">Practise now</button></div>`:`<div class="crit-item"><div><b>${esc(c.k.topic)}</b><p class="quiet">${esc(c.k.subj)} · ${carryLabel(c.days)} · ${Math.max(0,c.k.plan-c.k.spent)} min left</p></div><div class="actions"><button class="btn sm" data-act="partial" data-id="${esc(c.k.id)}">Log progress</button><button class="btn sm ghost" data-act="resched" data-id="${esc(c.k.id)}">Reschedule</button></div></div>`).join('');
+  const schedule=current.map(lessonCard).join('') || `<div class="empty"><b>${done.length?'Today’s lessons are complete':'Your day is ready to plan'}</b>${overdue.length?'You can choose a carried lesson below.':'Add a lesson or open your SSC plan.'}</div>`;
+  const carriedGroups=[...new Set(overdue.map(carried))].sort((a,b)=>b-a).map(age=>{
+    const rows=overdue.filter(k=>carried(k)===age), key='schedule-carried:'+age;
+    return `<details class="schedule-group" data-disclosure="${key}"${disclosureOpen(key)}><summary><b>${carryLabel(age)}</b><span class="quiet">${rows.length} lessons · ${sum(rows,k=>Math.max(0,k.plan-k.spent))} min left</span></summary>${rows.map(lessonCard).join('')}</details>`;
+  }).join('');
+  const expRows=S.exp.filter(e=>e.date===t).map(e=>`<div class="exp"><span>${esc(e.note||e.cat)}</span><b>${inr(e.amt)}</b></div>`).join('')+(cTotal(t)?`<div class="exp"><span>DHANAM Canteen</span><b>${inr(cTotal(t))}</b></div>`:'');
+  return `<div class="home-layout">
+    <section class="card home-today" aria-labelledby="today-heading"><div class="today-heading"><div><p class="label">${longD(t)}${activeDay?' · Plan day '+activeDay:''}</p><h3 id="today-heading">${greet}, ${esc(S.name||'there')}</h3><p class="quiet">${exam===null?'One lesson at a time. Keep moving forward.':exam>=0?exam+' days to your exam':'Your exam date has passed. Update it in Settings.'}</p></div><span class="streak-pill">${ICON.flame}${streak()} day streak</span></div>
+    <div class="today-metrics"><div><b>${hrs(mins)} <small>h</small></b><span>studied · goal ${esc(S.settings.target)} h</span></div><div><b>${done.length}<small> / ${tk.length}</small></b><span>lessons completed</span></div></div><div class="bar" role="progressbar" aria-label="Today's lessons completed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div></section>
+    <section class="card next-lesson" aria-labelledby="next-heading"><span class="eyebrow">${next?'Your next step':'A little practice goes a long way'}</span><h3 id="next-heading">${next?esc(next.topic):'Ready for your next challenge?'}</h3><p>${next?`${esc(next.subj)} · ${Math.max(0,next.plan-next.spent)} min left · ${carried(next)?carryLabel(carried(next)):'Today'}`:'Choose a topic and build your accuracy.'}</p><div class="actions">${next?`<button class="btn" data-act="focusLesson" data-id="${esc(next.id)}">Continue studying <span aria-hidden="true">→</span></button><button class="btn ghost" data-act="partial" data-id="${esc(next.id)}">Log progress</button>`:'<button class="btn" data-act="nav" data-v="practice">Start topic practice →</button>'}</div></section>
+    ${remBanner()}
+    <section class="card schedule-card" aria-labelledby="schedule-heading"><div class="section-heading"><div><h3 id="schedule-heading">Today's schedule</h3><p class="quiet">${current.length} lessons left today${overdue.length?' · '+overdue.length+' carried':''}</p></div><button class="btn sm ghost" data-act="addTask">+ Add task</button></div><div class="lesson-list">${schedule}</div>${carriedGroups}${done.length?`<details class="schedule-group" data-disclosure="completed-today"${disclosureOpen('completed-today')}><summary><b>Completed today</b><span class="quiet">${done.length} lessons ✓</span></summary>${done.map(lessonCard).join('')}</details>`:''}<button class="btn sm ghost timer-link" data-act="nav" data-v="study">${ICON.study} Start focus timer</button></section>
+    <button class="revision-shortcut" data-act="nav" data-v="revisionQueue">${ICON.rev}<span><b>${reviews?reviews+' reviews ready':'Your revision queue'}</b><small>Day 1 · Day 3 · Day 7 · Day 15 · Day 30</small></span><span aria-hidden="true">→</span></button>
+    ${crit.length || missed===1?foldCard('Needs attention',attention+(missed===1?'<p class="quiet">You missed Quick Revision yesterday. A short drill can keep your revision habit going.</p><button class="btn sm ghost" data-act="nav" data-v="rev">Practise revision</button>':''),'attention',crit.length?`${crit.length} critical items · open to review`:'Quick Revision missed yesterday'):''}
+    ${planTracking()}
+    <div class="home-secondary">${dailyPlannerHTML()}</div>
+    ${foldCard('Study suggestions',ssc.dailyHTML(),'suggestions','Due reviews, weak topics and practice shortcuts')}
+    ${foldCard('Life and achievements',`<div class="grid g2">${card('Money today',expRows+`<div class="exp"><b>Total</b><b>${inr(spent)}</b></div><button class="btn sm ghost" data-act="nav" data-v="money">Money & meetings</button>`)}${card('Meetings today',meets.map(m=>`<div class="exp"><b>${esc(m.title)}</b><span>${esc(m.time||'')}</span></div>`).join('')||'<p class="quiet">No meetings today.</p>')}${todoCompact()}${card('Level and badges',`<div class="xp"><div class="lv">${g.level}</div><div><b>${g.xp} XP</b><p class="quiet">Best streak: ${bestStreak()} days</p></div></div><div class="badgeRow">${g.badges.map(b=>`<div class="bdg ${b[1]?'on':'off'}"><b>${b[1]?'★':'☆'}</b>${esc(b[0])}</div>`).join('')}</div>`)}</div>`,'life','Money, meetings, to-dos and badges')}
+    <p class="quote">${esc(S.settings.why?'My why: '+S.settings.why:QUOTES[(parseD(t).getDate()+parseD(t).getMonth())%QUOTES.length])}</p>
+  </div>`;
 };
-AFTER.home = () => { requestAnimationFrame(() => setTimeout(() => { const r = $('#ring'); if (r) r.style.strokeDashoffset = 351.86 * (1 - r.dataset.pct / 100); }, 40)); };
 
 /* =============== Views: Study Timer =============== */
-const T = { mode: 'focus', total: 0, endAt: 0, running: false, left: 0, elapsed: 0, last: 0, iv: null, subj: 'Quant', topic: '' };
+const T = { task: '', mode: 'focus', total: 0, endAt: 0, running: false, left: 0, elapsed: 0, last: 0, iv: null, subj: 'Quant', topic: '' };
 const tTotal = () => (T.mode === 'focus' ? S.settings.pomo : S.settings.brk) * 60;
 function tReset(mode) { clearInterval(T.iv); T.running = false; T.mode = mode || 'focus'; T.total = tTotal(); T.left = T.total; T.elapsed = 0; }
 function tTick() {
@@ -591,8 +579,9 @@ function beep() {
   try { const ac = new (window.AudioContext || window.webkitAudioContext)(), o = ac.createOscillator(), g = ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value = 880; g.gain.setValueAtTime(.2, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .8); o.start(); o.stop(ac.currentTime + .8); } catch (e) { /* no sound */ }
 }
 function saveSession(min, pre) {
+  const selected = !pre && S.tasks.find(k=>k.id===T.task && k.pk && !k.done && k.subj===T.subj && k.topic===T.topic);
   openForm('Save study session', [
-    { k: 'task', label: 'Count toward plan topic (optional)', type: 'select', options: [['', 'Extra study (not linked)'], ...S.tasks.filter(k => k.pk && !k.done).map(k => [k.id, k.subj + ': ' + k.topic])] },
+    { k: 'task', label: 'Count toward plan topic (optional)', type: 'select', value: selected?.id || '', options: [['', 'Extra study (not linked)'], ...S.tasks.filter(k => k.pk && !k.done).map(k => [k.id, k.subj + ': ' + k.topic])] },
     { k: 'subj', label: 'Subject', type: 'select', options: SUBJECTS, value: (pre && pre.subj) || T.subj },
     { k: 'topic', label: 'Topic', value: (pre && pre.topic) || T.topic, ph: 'e.g. Percentage', req: 1 },
     { k: 'min', label: 'Minutes', type: 'number', value: min, min: 1, req: 1 },
@@ -1210,6 +1199,12 @@ const ACT = {
     if(!Number.isFinite(v.minutes) || v.minutes<0){toast('Enter zero or a positive number of minutes.');return;}
     focusPrefs().available=v.minutes;persist();render();
   }),
+  focusLesson: d => {
+    const task=S.tasks.find(k=>k.id===d.id);
+    if(!task || task.done){render();return;}
+    if(T.running || T.elapsed>0) { show('study');toast('Your current focus session is still active.');return; }
+    T.task=task.id;T.subj=task.subj;T.topic=task.topic;show('study');
+  },
   nav: (d) => show(d.v),
   theme: () => { const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; r.dataset.theme = dark ? 'light' : 'dark'; lsSet('sst_theme', r.dataset.theme); if (CUR === 'set') render(); },
   logout: () => logout(),
