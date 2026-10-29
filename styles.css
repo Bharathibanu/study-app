@@ -495,3 +495,11 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 @media(prefers-reduced-motion:reduce){.fold-chevron,.lesson-card,.revision-shortcut{transition:none}}
 @media(min-width:1000px){.lesson-list{grid-template-columns:repeat(2,minmax(0,1fr))}.next-lesson{display:flex;flex-direction:column;justify-content:center}.next-lesson .actions{margin-top:24px}}
 @media(max-width:600px){.next-lesson .actions{display:grid;grid-template-columns:1fr}.next-lesson .actions .btn{width:100%}.next-lesson .actions .btn.ghost{border-color:transparent;background:transparent;box-shadow:none}}
+
+/* Daily vocabulary remains readable on phones and works without a network request. */
+.vocabulary-date{margin-bottom:16px}
+.vocabulary-list{padding-left:26px;margin:0 0 18px}
+.vocabulary-list li{padding:12px 0 12px 6px;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.vocabulary-list li::marker{color:var(--muted);font-size:13px}
+.vocabulary-list b{font-size:17px;color:var(--teal)}
+.vocabulary-list p{margin-top:4px;color:var(--ink);font-size:15px;line-height:1.6}

@@ -176,7 +176,7 @@ Records test name, date, score, maximum marks, time and notes. Displays performa
 
 ### Notes & Vocabulary
 
-Stores personal notes/tags and shows the built-in vocabulary list. The built-in Formula Vault and its search have been removed. Personal notes remain in account state; formula explanations within Maths Tricks are separate teaching material.
+Stores personal notes/tags and shows 10 vocabulary words per calendar day from an offline bank of 300 words. A continuous date index selects one of 30 non-overlapping sets, including across month/year boundaries; the same calendar date gives the same set on different devices. Sets repeat every 30 days for revision. The current date and set number are visible. Returning to the app or leaving it open past midnight refreshes only the word panel, preserving open note drafts. These are general English study words, not a verified SSC PYQ list. The built-in Formula Vault and its search have been removed. Personal notes remain in account state; formula explanations within Maths Tricks are separate teaching material.
 
 ### Multiplication Tricks
 

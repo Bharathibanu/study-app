@@ -2,6 +2,7 @@
    Data lives in one object (S). It is saved on this device (localStorage)
    and, if Firebase is set up, synced to your account so phone and PC match. */
 import * as cloud from './cloud.js';
+import { dailyVocabulary, VOCABULARY } from './vocabulary.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
 import { multiplicationQuestions, trickVisual, sscMathHTML, modelExercise } from './maths-tricks.js';
@@ -978,18 +979,22 @@ VIEWS.mocks = function () {
   <div class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0">Mock test log</h3><button class="btn sm" data-act="addMock">Log mock test</button></div>${ms.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Test</th><th>Score</th><th>Percent</th><th>Time</th><th>Notes</th><th></th></tr></thead><tbody>${ms.slice().reverse().map((m) => `<tr><td class="n">${fmtD(m.date)}</td><td>${esc(m.name)}</td><td class="n">${esc(m.score)} / ${esc(m.max)}</td><td class="n">${Math.round(m.score / m.max * 100)}%</td><td class="n">${m.mins ? m.mins + ' min' : '-'}</td><td>${esc(m.notes || '')}</td><td><button class="mini del" data-act="delMock" data-id="${esc(m.id)}" aria-label="Delete">&times;</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No mock tests yet</b>Write what went wrong in the notes column. It becomes your revision list.</div>'}</div>`;
 };
 
-/* =============== Views: Notes, formulas, words =============== */
-const WORDS = [
-  ['Benevolent', 'Kind and generous'], ['Candid', 'Open and honest'], ['Diligent', 'Careful and hard-working'], ['Eloquent', 'Fluent and persuasive in speech'], ['Frugal', 'Careful with money'],
-  ['Gregarious', 'Fond of company'], ['Hostile', 'Unfriendly, opposed'], ['Impartial', 'Treating all sides equally'], ['Jubilant', 'Feeling great joy'], ['Lucid', 'Clear and easy to understand'],
-  ['Meticulous', 'Very careful about detail'], ['Nostalgia', 'Longing for the past'], ['Obsolete', 'No longer in use'], ['Pragmatic', 'Practical rather than theoretical'], ['Resilient', 'Able to recover quickly'],
-  ['Scrupulous', 'Very honest and careful'], ['Tenacious', 'Holding firmly, not giving up'], ['Unanimous', 'Agreed by everyone'], ['Verbose', 'Using more words than needed'], ['Zealous', 'Full of eager enthusiasm']
-];
+/* =============== Views: Notes and daily vocabulary =============== */
+function vocabularyHTML() {
+  const batch=dailyVocabulary(today());
+  return `<section class="card vocabulary-card" id="vocabulary" data-date="${esc(batch.date)}" aria-labelledby="vocabulary-title"><h3 id="vocabulary-title">Ten words today</h3><p class="quiet vocabulary-date">${longD(batch.date)} · Set ${batch.set} of ${batch.cycleDays}</p><ol class="vocabulary-list">${batch.words.map(w=>`<li data-word="${esc(w.id)}"><b>${esc(w.word)}</b><p>${esc(w.meaning)}</p></li>`).join('')}</ol><p class="quiet">A different set each day, with the same words all day on your devices. ${VOCABULARY.length} words across ${batch.cycleDays} sets; sets repeat after ${batch.cycleDays} days for revision. General English study words, not verified SSC previous-year questions.</p></section>`;
+}
+function refreshVocabulary() {
+  const panel=$('#vocabulary');
+  // Replace only the word panel; leave personal notes and any open draft untouched.
+  if(S && !$('#app').hidden && CUR==='notes' && panel && panel.dataset.date!==today())panel.outerHTML=vocabularyHTML();
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshVocabulary();});
+window.addEventListener('focus',refreshVocabulary);
 VIEWS.notes = function () {
-  const off = parseD(today()).getDate() % 2 * 10, words = WORDS.slice(off, off + 10);
   return `<div class="grid g2">
   ${card('Notes (current affairs and quick points)', `<div class="actions" style="margin-bottom:12px"><button class="btn sm" data-act="addNote">Add note</button></div><div class="list">${S.notes.slice().reverse().slice(0, 30).map((n) => `<div class="li"><div class="l"><b>${esc(n.tag || 'Note')}</b> <span class="quiet">${fmtD(n.date)}</span><div>${esc(n.text)}</div></div><button class="mini del" data-act="delNote" data-id="${esc(n.id)}" aria-label="Delete">&times;</button></div>`).join('') || '<div class="empty"><b>No notes yet</b>Add today\'s current affairs or a point you keep forgetting.</div>'}</div>`)}
-  ${card('Ten words today', `<div class="list">${words.map((w) => `<div class="li"><div class="l"><b>${w[0]}</b><small>${w[1]}</small></div></div>`).join('')}</div>`)}
+  ${vocabularyHTML()}
   </div>
 `;
 };
@@ -1464,6 +1469,7 @@ document.addEventListener('input', (e) => { const el = e.target.closest('[data-i
 let remIv = null;
 function checkReminders() {
   if (!S) return;
+  refreshVocabulary();
   const now = Date.now(); let any = null;
   S.todos.forEach((x) => { if (!x.done && x.remind && !x.fired && new Date(x.remind).getTime() <= now) { x.fired = true; any = x; notify('Reminder: ' + x.title); } });
   if (any) { persist(); toast('Reminder: ' + any.title); if ((CUR === 'todo' || CUR === 'home') && $('#modal').hidden) render(); }
