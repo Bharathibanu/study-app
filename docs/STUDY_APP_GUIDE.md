@@ -154,6 +154,16 @@ Load the supplied timetable, upload CSV or paste CSV text. Choose Day 1 when dat
 
 Separate from study tasks. Cards have title, note, priority, due date, reminder and completion date. Open/done/all filters and waiting/overdue statistics help manage general work. Finishing a to-do does not award minutes to a timetable topic.
 
+### PDF Materials
+
+Open **More → PDF Materials** on a phone, or **PDF Materials** in the desktop sidebar. The four main folders are Mathematics, Reasoning, English and GS & GK. The initial library includes GS & GK → History → History one liner, using the user-provided Google Drive file link. It is added once; deleting the bookmark does not make it reappear on reload.
+
+Create subfolders within a subject or existing folder. Add PDF link saves a title, destination folder and Google Drive sharing URL. Edit / move can rename a material or move it between folders. Folder editing supports renaming and moving; only empty custom folders can be removed. Search covers all subjects and nested folder paths. Breadcrumbs move between folders; the existing Home button and phone Back behaviour still return to Home from this section.
+
+Only folder and bookmark metadata is saved in the existing account, included in backups and synced to Firebase. PDF bytes stay in Google Drive; no Firebase Storage or Drive API credentials are introduced. Open in Drive uses normal Drive permissions and can use a Google account different from the app account. It does not make the file public or change sharing access. Saved lists remain available offline; PDF content needs Drive access or Drive's own Make available offline feature.
+
+The UI lives in `materials.js`; its validation and mutations are pure exports in `ssc-core.js`. `materialFolders` and `materials` use stable record IDs for account merging. New records and edits validate the whole hierarchy, reject missing parents/cycles/duplicate sibling names and accept only supported HTTPS sharing links on drive.google.com. Editors resolve the current record at submission. Sync pauses for review if a concurrent folder deletion would orphan another device's new material.
+
 ### Learning
 
 Tracks books, total pages and dated page logs. Progress and pace estimates use logged pages. Learning cards contain what you learned, tags and optional book links. Pages and learning notes are not automatically converted into timetable achievement minutes.

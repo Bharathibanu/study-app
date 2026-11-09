@@ -2,6 +2,7 @@
    Data lives in one object (S). It is saved on this device (localStorage)
    and, if Firebase is set up, synced to your account so phone and PC match. */
 import * as cloud from './cloud.js';
+import { installMaterials } from './materials.js';
 import { dailyVocabulary, VOCABULARY } from './vocabulary.js';
 import { installSsc } from './ssc.js';
 import { MASTERCLASS_ADDITIONS, MASTERCLASS_TEST, masterclassIntro, masterclassResources, mergedExampleHTML, suggestedMethod, mentalPracticeQuestions } from './mental-masterclass.js';
@@ -81,6 +82,7 @@ const NAV = [
   { id: 'mockAnalysis', label: 'CGL Mock Analysis' },
   { id: 'pyq', label: '2024–2025 PYQ Bank' },
   { id: 'todo', label: 'To-Do' },
+  { id: 'materials', label: 'PDF Materials' },
   { id: 'learn', label: 'Learning' },
   { id: 'diary', label: 'Diary' },
   { id: 'canteen', label: 'DHANAM Canteen' },
@@ -92,6 +94,8 @@ const NAV = [
 ];
 const TITLES = { home: 'Home', trend: 'Trendline', rev: 'Quick Revision', rep: 'Reports', study: 'Study Timer', revlog: 'Revision Log', plan: 'SSC 200-Day Plan', tricks: 'SSC Maths Tricks', todo: 'To-Do', learn: 'Learning', diary: 'Personal Diary', canteen: 'DHANAM Canteen', money: 'Money & Meetings', mocks: 'Mock Tests', notes: 'Notes & Vocabulary', set: 'Settings', more: 'More' };
 
+ICON.materials = ICON.learn;
+TITLES.materials = 'PDF Materials';
 Object.assign(ICON, { practice: ICON.rev, mistakes: ICON.notes, revisionQueue: ICON.revlog, mockAnalysis: ICON.mocks, pyq: ICON.plan });
 Object.assign(TITLES, { practice: 'SSC CGL Topic Practice', mistakes: 'Mistake Notebook', revisionQueue: 'Automatic Revision Queue', mockAnalysis: 'CGL Mock Analysis', pyq: '2024–2025 SSC PYQ Bank' });
 
@@ -103,6 +107,7 @@ const blank = () => ({
   v: 1, _u: 0, created: today(), name: '',
   settings: { target: 6, budget: 6000, exam: '', pomo: 25, brk: 5, why: '', day1: '' },
   plan: [], planFrom: '', tasks: [], logs: [], rev: [], exp: [], meet: [], qr: [], mist: [], mocks: [], notes: [], mastered: {},
+  materialsInitialized: false, materialFolders: [], materials: [],
   dailyFocus: {}, practice: [], mistakeBook: [], revisionHistory: [], mockAnalyses: [], masterclassDays: [],
   canteen: { prices: { tea: 12, snack: 10, lunch: 52 }, days: {} }, todos: [], books: [], learn: [], diary: []
 });
@@ -1533,7 +1538,7 @@ $('#lform').addEventListener('submit', async (e) => {
 function startSession(name, uidv) {
   deviceSaveProblem = ''; UID = uidv; KEY = uidv ? 'sst_state_' + uidv : 'sst_state_local';
   clearTimeout(saveT); syncState.unsubscribe?.(); syncState.generation++; syncState.saving = false; syncState.conflict = null; syncState.problem = '';
-  loadLocal(); syncState.legacyCandidate = clone(S); ssc.resetSession(); ssc.ensure();
+  loadLocal(); syncState.legacyCandidate = clone(S); ssc.resetSession(); materials.resetSession(); ssc.ensure();
   try { syncState.base = JSON.parse(lsGet(KEY + '_server') || 'null'); } catch { syncState.base = null; }
   syncState.dirty = syncState.base ? !sameState(S,syncState.base) : S._u > 0;
   if (!S.name) S.name = name || ''; const pn = lsGet('sst_pendingname'); if (pn && uidv) { S.name = pn; lsDel('sst_pendingname'); }
@@ -1589,6 +1594,7 @@ ACT.syncUseDevice = () => {
 };
 window.addEventListener('online', () => { if (UID && syncState.dirty) syncAccount(); });
 window.addEventListener('offline', () => { if (UID) setSync(syncState.dirty ? 'Saved locally · offline' : 'Offline · using device copy'); });
+const materials = installMaterials({state:()=>S,persist,render,esc,openForm,toast,uid,today,ACT,INP,VIEWS,accountToken:()=>syncState.generation});
 const ssc = installSsc({ state: () => S, persist, render, show, card, esc, today, uid, openForm, toast, ACT, CHG, VIEWS, download, current: () => CUR });
 
 async function boot() {

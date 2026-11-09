@@ -6,7 +6,7 @@ export const clone = value => value == null ? value : JSON.parse(JSON.stringify(
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 const stable = value => value === undefined ? 'undefined' : JSON.stringify(value, (_, v) => object(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k,v[k]])) : v);
 export const same = (a,b) => stable(a) === stable(b);
-export function content(state) { const copy = clone(state); if (copy) { delete copy._u; delete copy._sync; if (!copy.dailyFocus || object(copy.dailyFocus) && !Object.keys(copy.dailyFocus).length) delete copy.dailyFocus; for (const key of ['practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays']) if (!copy[key] || Array.isArray(copy[key]) && !copy[key].length) delete copy[key]; } return copy; }
+export function content(state) { const copy = clone(state); if (copy) { delete copy._u; delete copy._sync; if (!copy.dailyFocus || object(copy.dailyFocus) && !Object.keys(copy.dailyFocus).length) delete copy.dailyFocus; if(!copy.materialsInitialized)delete copy.materialsInitialized; for (const key of ['practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays','materialFolders','materials']) if (!copy[key] || Array.isArray(copy[key]) && !copy[key].length) delete copy[key]; } return copy; }
 export const sameState = (a,b) => same(content(a),content(b));
 const identity = (row,path) => row && row.id != null ? String(row.id) : path === 'plan' && row ? [row.date,row.subj,row.topic].join('|') : null;
 export function mergeStates(base, local, remote) {
@@ -53,6 +53,7 @@ export function mergeStates(base, local, remote) {
     if (!same(left,before) && !same(right,before) && !same(left,right)) conflicts.push('task-progress['+id+']');
   }
   const state = merge(base,local,remote,'');
+  try { validateMaterialLibrary(state); } catch(error) { conflicts.push('materials: '+error.message); }
   state._u = Math.max(Date.now(),local?._u || 0,remote?._u || 0);
   return { state, conflicts };
 }
@@ -173,7 +174,7 @@ export function validateBackup(value) {
   if(!object(value) || !Array.isArray(value.logs))fail('expected an account object with study logs.');
   const stack=[value];while(stack.length){const item=stack.pop();for(const [key,child] of Object.entries(item)){if(['__proto__','prototype','constructor'].includes(key))fail('unsupported object key.');if(child && typeof child==='object')stack.push(child);}}
   if(value.name!==undefined && typeof value.name!=='string')fail('name must be text.');
-  const collections=['plan','tasks','logs','rev','exp','meet','qr','mist','mocks','notes','practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays','todos','books','learn','diary'];
+  const collections=['plan','tasks','logs','rev','exp','meet','qr','mist','mocks','notes','practice','mistakeBook','revisionHistory','mockAnalyses','masterclassDays','todos','books','learn','diary','materialFolders','materials'];
 
   for(const key of collections){
     if(value[key]===undefined)continue;
@@ -192,6 +193,7 @@ export function validateBackup(value) {
   for(const row of value.mockAnalyses || []){if(!Array.isArray(row.sections))fail('mock sections are malformed.');validateMockSections(row.sections);}
   if(value.canteen){if(!object(value.canteen.prices) || !object(value.canteen.days) || Object.values(value.canteen.days).some(r=>!object(r) || !object(r.p)))fail('canteen data is malformed.');}
   for(const entry of Object.values(value.dailyFocus || {}))if(!object(entry) || entry.pins!==undefined && (!Array.isArray(entry.pins) || entry.pins.some(id=>typeof id!=='string')) || entry.available!==undefined && (!Number.isFinite(entry.available) || entry.available<0))fail('daily priorities are malformed.');
+  validateMaterialLibrary(value);
   return value;
 }
 
@@ -276,4 +278,91 @@ export function logBookPages(state,id,pages,date) {
   const credit=Math.min(pages,remaining);
   if(credit){book.log=history;book.log.push({date,pages:credit});}
   return {book,pages:credit};
+}
+
+/* Google Drive material bookmarks: folders and links are account data; PDF bytes stay in Drive. */
+export const MATERIAL_ROOTS = Object.freeze([
+  Object.freeze({id:'materials:math',name:'Mathematics'}),
+  Object.freeze({id:'materials:reasoning',name:'Reasoning'}),
+  Object.freeze({id:'materials:english',name:'English'}),
+  Object.freeze({id:'materials:gs',name:'GS & GK'})
+]);
+export const HISTORY_MATERIAL_URL = 'https://drive.google.com/file/d/1QeglNdqTzJOb-Wz2WdkhcQ4ySHM7WVgY/view?usp=sharing';
+export function driveMaterialLink(value) {
+  let url;
+  try { url=new URL(typeof value==='string'?value.trim():''); } catch { throw new Error('Paste a Google Drive file or folder link.'); }
+  if(url.protocol!=='https:' || url.hostname!=='drive.google.com' || url.port || url.username || url.password)throw new Error('Use an HTTPS link from drive.google.com.');
+  const file=/^\/file\/d\/[\w-]+(?:\/(?:view|preview|edit))?\/?$/.test(url.pathname);
+  const folder=/^\/drive\/(?:u\/\d+\/)?folders\/[\w-]+\/?$/.test(url.pathname);
+  const shared=url.pathname==='/open' && /^[\w-]+$/.test(url.searchParams.get('id') || '');
+  if(!file && !folder && !shared)throw new Error('Copy the sharing link of a Drive file or folder.');
+  return {url:url.href,kind:folder?'folder':'file'};
+}
+const materialText=(value,label,max)=>{
+  if(typeof value!=='string' || !value.trim() || value.trim().length>max)throw new Error(label+' must contain 1–'+max+' characters.');
+  return value.trim();
+};
+export function validateMaterialLibrary(state) {
+  if(state.materialsInitialized!==undefined && typeof state.materialsInitialized!=='boolean')throw new Error('Material library setup must be true or false.');
+  const folders=state.materialFolders===undefined?[]:state.materialFolders, files=state.materials===undefined?[]:state.materials;
+  if(!Array.isArray(folders) || !Array.isArray(files))throw new Error('Material folders and links must contain records.');
+  const map=new Map(MATERIAL_ROOTS.map(r=>[r.id,r])), names=new Set();
+  for(const f of folders){
+    if(!object(f) || typeof f.id!=='string' || !f.id.trim() || map.has(f.id) || typeof f.parent!=='string')throw new Error('Material folders need unique IDs and a parent folder.');
+    const name=materialText(f.name,'Folder name',80), key=JSON.stringify([f.parent,name.toLowerCase()]);
+    if(names.has(key))throw new Error('A folder with that name already exists here.');
+    names.add(key);map.set(f.id,f);
+  }
+  for(const f of folders){
+    if(!map.has(f.parent))throw new Error('The parent folder no longer exists. Choose another folder.');
+    const visited=new Set([f.id]);let parent=f.parent;
+    while(parent){
+      if(visited.has(parent))throw new Error('A folder cannot be placed inside itself.');
+      visited.add(parent);const item=map.get(parent);
+      if(!item)throw new Error('The parent folder no longer exists. Choose another folder.');
+      parent=item.parent;
+    }
+  }
+  const ids=new Set();
+  for(const f of files){
+    if(!object(f) || typeof f.id!=='string' || !f.id.trim() || ids.has(f.id))throw new Error('Material links need unique IDs.');
+    ids.add(f.id);materialText(f.title,'Material title',150);
+    if(!map.has(f.folder))throw new Error('The material folder no longer exists. Choose another folder.');
+    if(typeof f.url!=='string' || f.url.length>2000)throw new Error('The Drive link is too long.');
+    driveMaterialLink(f.url);
+  }
+  return state;
+}
+export function initialiseMaterials(state) {
+  if(state.materialsInitialized)return false;
+  validateMaterialLibrary(state);
+  state.materialFolders ||= [];state.materials ||= [];
+  if(!state.materialFolders.length && !state.materials.length){
+    // Stable IDs and dates allow two devices to initialise the same starter without duplicates.
+    state.materialFolders.push({id:'materials:history',parent:'materials:gs',name:'History',date:'2026-11-09'});
+    state.materials.push({id:'materials:history-one-liner',folder:'materials:history',title:'History one liner',url:HISTORY_MATERIAL_URL,date:'2026-11-09'});
+  }
+  state.materialsInitialized=true;
+  return true;
+}
+export function saveMaterialFolder(state,draft,original=null) {
+  const row={...draft,name:materialText(draft.name,'Folder name',80)};
+  const folders=clone(state.materialFolders || []);
+  if(original)applyRecordEdit(folders,row.id,original,{name:row.name,parent:row.parent});
+  else {if(folders.some(f=>f.id===row.id))throw new Error('This folder already exists.');folders.push(row);}
+  validateMaterialLibrary({...state,materialFolders:folders});state.materialFolders=folders;
+  return folders.find(f=>f.id===row.id);
+}
+export function saveMaterialLink(state,draft,original=null) {
+  const row={...draft,title:materialText(draft.title,'Material title',150),url:driveMaterialLink(draft.url).url};
+  const files=clone(state.materials || []);
+  if(original)applyRecordEdit(files,row.id,original,{title:row.title,folder:row.folder,url:row.url});
+  else {if(files.some(f=>f.id===row.id))throw new Error('This material already exists.');files.push(row);}
+  validateMaterialLibrary({...state,materials:files});state.materials=files;
+  return files.find(f=>f.id===row.id);
+}
+export function removeMaterialFolder(state,id) {
+  if(MATERIAL_ROOTS.some(f=>f.id===id))throw new Error('The four main subject folders are kept permanently.');
+  if((state.materialFolders || []).some(f=>f.parent===id) || (state.materials || []).some(f=>f.folder===id))throw new Error('This folder is not empty. Move or remove its contents first.');
+  state.materialFolders=(state.materialFolders || []).filter(f=>f.id!==id);
 }

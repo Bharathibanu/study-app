@@ -503,3 +503,37 @@ body{background-image:radial-gradient(ellipse at top right,color-mix(in srgb,var
 .vocabulary-list li::marker{color:var(--muted);font-size:13px}
 .vocabulary-list b{font-size:17px;color:var(--teal)}
 .vocabulary-list p{margin-top:4px;color:var(--ink);font-size:15px;line-height:1.6}
+
+/* PDF material bookmarks: subject folders, readable paths and direct Drive links. */
+.materials-library{display:grid;gap:20px;min-width:0}
+.materials-intro h3{font-size:26px;margin:7px 0 10px}
+.materials-intro .actions{margin-top:18px}
+.materials-library>.section-heading{margin-bottom:0;align-items:center;flex-wrap:wrap}
+.materials-library .label{display:block;margin-bottom:6px}
+.material-folders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.material-folder{display:flex;align-items:center;gap:14px;text-align:left;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);min-width:0;min-height:104px;transition:border-color .18s,background-color .18s}
+.material-folder:hover{border-color:var(--teal);background:color-mix(in srgb,var(--teal) 5%,var(--surface))}
+.material-folder-icon{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--surface2);color:var(--teal);flex-shrink:0}
+.material-folder>span:nth-child(2){flex:1;min-width:0}
+.material-folder b{font-family:var(--f-display);font-size:18px;display:block;overflow-wrap:anywhere}
+.material-folder small{display:block;color:var(--muted);margin-top:5px;font-size:13px}
+.material-breadcrumbs{display:flex;flex-wrap:wrap;align-items:center;gap:5px;color:var(--muted)}
+.material-breadcrumbs button{min-height:44px;max-width:100%;padding:8px 10px;border:0;background:transparent;color:var(--teal);border-radius:8px;overflow-wrap:anywhere;text-align:left}
+.material-breadcrumbs button[aria-current=page]{color:var(--ink);font-weight:700;background:var(--surface2)}
+.material-files{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.material-file{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--surface);min-width:0}
+.material-file h4{font-family:var(--f-display);font-size:20px;margin:0;overflow-wrap:anywhere}
+.material-file-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.material-file .actions{margin-top:auto;padding-top:8px}
+.material-file a.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.material-path{overflow-wrap:anywhere;line-height:1.7}
+.material-menu{display:flex;text-align:right}
+.material-menu summary{display:grid;place-items:center;min-width:44px;min-height:44px;list-style:none;border:1px solid var(--line);border-radius:10px;cursor:pointer;font-size:24px;line-height:1}
+.material-menu summary::-webkit-details-marker{display:none}
+.material-menu .btn{margin-top:8px}
+.materials-help{padding:16px;border-radius:14px;background:var(--surface2);line-height:1.8}
+@media(max-width:600px){.material-folders,.material-files{grid-template-columns:1fr}.material-folder{padding:18px;min-height:94px}.material-file .actions .btn:first-child{flex:1}.materials-intro .actions .btn{flex:1}.materials-library>.section-heading h3{font-size:22px}.material-breadcrumbs{gap:1px}.materials-intro h3{font-size:24px}}
+
+.material-file .badge{background:var(--surface2);color:var(--teal)}
+
+.materials-compact .actions{margin-top:0}
