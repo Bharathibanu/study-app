@@ -85,6 +85,7 @@ export function installMaterials({state,persist,render,esc,openForm,toast,uid,to
     const map=folderMap();if(folder && !map.has(folder))folder='';
     const current=map.get(folder), term=query.trim().toLowerCase();
     const shownFolders=(term?folders().filter(f=>pathName(f.id).toLowerCase().includes(term)):folder?(s.materialFolders || []).filter(f=>f.parent===folder):MATERIAL_ROOTS);
+    if(folder || term)shownFolders.sort((a,b)=>a.name.localeCompare(b.name));
     const shownFiles=(s.materials || []).filter(f=>term?(f.title+' '+pathName(f.folder)).toLowerCase().includes(term):f.folder===folder).sort((a,b)=>a.title.localeCompare(b.title));
     return `<div class="materials-library"><section class="card materials-intro${current?' materials-compact':''}">${current?'':'<span class="eyebrow">Your study bookshelf</span><h3>PDF Materials</h3><p class="quiet">Organise your Google Drive PDFs by subject and topic. Open them with the Google account that has access—even if it differs from your study-app account.</p>'}<div class="actions"><button class="btn sm" data-act="materialAdd">+ Add PDF link</button><button class="btn sm ghost" data-act="materialNewFolder">+ Create folder</button></div></section>
       <div><label class="label" for="material-search">Search all materials and folders</label><input class="inp" type="search" id="material-search" data-inp="materialSearch" value="${esc(query)}" placeholder="Search History, algebra, notes…"></div>

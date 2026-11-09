@@ -288,6 +288,8 @@ export const MATERIAL_ROOTS = Object.freeze([
   Object.freeze({id:'materials:gs',name:'GS & GK'})
 ]);
 export const HISTORY_MATERIAL_URL = 'https://drive.google.com/file/d/1QeglNdqTzJOb-Wz2WdkhcQ4ySHM7WVgY/view?usp=sharing';
+export const GRAMMAR_MATERIAL_URL = 'https://drive.google.com/file/d/1AjpRzJa_-wdlxsoT1eiq2ULUn0yrpLW7/view?usp=drive_link';
+export const GS_MATERIAL_FOLDERS = Object.freeze(['Art and Culture','Economy','Environment','General Science','Geography','History','Polity']);
 export function driveMaterialLink(value) {
   let url;
   try { url=new URL(typeof value==='string'?value.trim():''); } catch { throw new Error('Paste a Google Drive file or folder link.'); }
@@ -304,6 +306,7 @@ const materialText=(value,label,max)=>{
 };
 export function validateMaterialLibrary(state) {
   if(state.materialsInitialized!==undefined && typeof state.materialsInitialized!=='boolean')throw new Error('Material library setup must be true or false.');
+  if(state.materialsVersion!==undefined && (!Number.isSafeInteger(state.materialsVersion) || state.materialsVersion<1))throw new Error('Material library version must be a positive integer.');
   const folders=state.materialFolders===undefined?[]:state.materialFolders, files=state.materials===undefined?[]:state.materials;
   if(!Array.isArray(folders) || !Array.isArray(files))throw new Error('Material folders and links must contain records.');
   const map=new Map(MATERIAL_ROOTS.map(r=>[r.id,r])), names=new Set();
@@ -334,15 +337,35 @@ export function validateMaterialLibrary(state) {
   return state;
 }
 export function initialiseMaterials(state) {
-  if(state.materialsInitialized)return false;
+  if(state.materialsInitialized && (state.materialsVersion || 1)>=3)return false;
   validateMaterialLibrary(state);
-  state.materialFolders ||= [];state.materials ||= [];
-  if(!state.materialFolders.length && !state.materials.length){
-    // Stable IDs and dates allow two devices to initialise the same starter without duplicates.
-    state.materialFolders.push({id:'materials:history',parent:'materials:gs',name:'History',date:'2026-11-09'});
-    state.materials.push({id:'materials:history-one-liner',folder:'materials:history',title:'History one liner',url:HISTORY_MATERIAL_URL,date:'2026-11-09'});
+  const next={...state,materialFolders:clone(state.materialFolders || []),materials:clone(state.materials || [])};
+  const uniqueId=(base,rows)=>{let id=base,n=2;while(rows.some(r=>r.id===id))id=base+':'+n++;return id;};
+  const ensureFolder=(parent,name,id)=>{
+    const key=value=>value.trim().replace(/\s+/g,' ').toLowerCase();
+    let folder=next.materialFolders.find(f=>f.parent===parent && key(f.name)===key(name));
+    if(!folder){folder={id:uniqueId(id,next.materialFolders),parent,name,date:'2026-11-09'};next.materialFolders.push(folder);}
+    return folder;
+  };
+  if(!next.materialsInitialized && !next.materialFolders.length && !next.materials.length){
+    const history=ensureFolder('materials:gs','History','materials:history');
+    next.materials.push({id:'materials:history-one-liner',folder:history.id,title:'History one liner',url:HISTORY_MATERIAL_URL,date:'2026-11-09'});
   }
-  state.materialsInitialized=true;
+  if((next.materialsVersion || 1)<2){
+    // Identify the actual Drive file, even if its sharing query or title was edited.
+    const grammarId=new URL(GRAMMAR_MATERIAL_URL).pathname.split('/')[3];
+    const alreadySaved=next.materials.some(file=>{const url=new URL(file.url);return (url.pathname.match(/^\/file\/d\/([^/]+)/)?.[1] || (url.pathname==='/open'?url.searchParams.get('id'):null))===grammarId;});
+    if(!alreadySaved){
+      const grammar=ensureFolder('materials:english','Grammar','materials:grammar');
+      next.materials.push({id:uniqueId('materials:english-grammar',next.materials),folder:grammar.id,title:'ENGLISH GRAMMAR',url:GRAMMAR_MATERIAL_URL,date:'2026-11-09'});
+    }
+  }
+  if((next.materialsVersion || 1)<3){
+    for(const name of GS_MATERIAL_FOLDERS)ensureFolder('materials:gs',name,name==='History'?'materials:history':'materials:gs-'+name.toLowerCase().replace(/ /g,'-'));
+  }
+  next.materialsInitialized=true;next.materialsVersion=Math.max(3,next.materialsVersion || 1);
+  validateMaterialLibrary(next);
+  state.materialFolders=next.materialFolders;state.materials=next.materials;state.materialsInitialized=next.materialsInitialized;state.materialsVersion=next.materialsVersion;
   return true;
 }
 export function saveMaterialFolder(state,draft,original=null) {

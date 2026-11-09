@@ -156,7 +156,7 @@ Separate from study tasks. Cards have title, note, priority, due date, reminder 
 
 ### PDF Materials
 
-Open **More → PDF Materials** on a phone, or **PDF Materials** in the desktop sidebar. The four main folders are Mathematics, Reasoning, English and GS & GK. The initial library includes GS & GK → History → History one liner, using the user-provided Google Drive file link. It is added once; deleting the bookmark does not make it reappear on reload.
+Open **More → PDF Materials** on a phone, or **PDF Materials** in the desktop sidebar. The four main folders are Mathematics, Reasoning, English and GS & GK. GS & GK contains Art and Culture, Economy, Environment, General Science, Geography, History and Polity. The library includes GS & GK → History → History one liner and English → Grammar → ENGLISH GRAMMAR, using the user-provided Google Drive file links. Versioned, one-time updates add these to existing accounts as well as new accounts, reuse matching folders and avoid duplicating a saved Grammar PDF. Existing bookmarks and custom folder names are preserved. Deleting a bookmark after its update does not make it reappear on reload.
 
 Create subfolders within a subject or existing folder. Add PDF link saves a title, destination folder and Google Drive sharing URL. Edit / move can rename a material or move it between folders. Folder editing supports renaming and moving; only empty custom folders can be removed. Search covers all subjects and nested folder paths. Breadcrumbs move between folders; the existing Home button and phone Back behaviour still return to Home from this section.
 
