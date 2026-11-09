@@ -290,6 +290,15 @@ export const MATERIAL_ROOTS = Object.freeze([
 export const HISTORY_MATERIAL_URL = 'https://drive.google.com/file/d/1QeglNdqTzJOb-Wz2WdkhcQ4ySHM7WVgY/view?usp=sharing';
 export const GRAMMAR_MATERIAL_URL = 'https://drive.google.com/file/d/1AjpRzJa_-wdlxsoT1eiq2ULUn0yrpLW7/view?usp=drive_link';
 export const GS_MATERIAL_FOLDERS = Object.freeze(['Art and Culture','Economy','Environment','General Science','Geography','History','Polity']);
+export const GS_MATERIAL_LINKS = Object.freeze([
+  Object.freeze({subject:'Art and Culture',title:'Art and Culture',url:'https://drive.google.com/file/d/1JATHdQU8GoHqG6gO7X0-liv_7_lh1xKv/view?usp=sharing'}),
+  Object.freeze({subject:'Economy',title:'Economy',url:'https://drive.google.com/file/d/1lRZdz7LH-BjVYUIB1pgN2izK4ZTR67P6/view?usp=drive_link'}),
+  Object.freeze({subject:'Environment',title:'Environment',url:'https://drive.google.com/file/d/15oKdLKui5GzeWxZZx3M2EMPuDoeM7n5v/view?usp=sharing'}),
+  Object.freeze({subject:'General Science',title:'General Science',url:'https://drive.google.com/file/d/1uJzOSYDjwzYNY-AUQqEfhv4kRvL5EgEV/view?usp=drive_link'}),
+  Object.freeze({subject:'Geography',title:'Geography',url:'https://drive.google.com/file/d/1-4SZOnXY_SJiMu-x90JFwKDu1Q7wsg0s/view?usp=drive_link'}),
+  Object.freeze({subject:'Polity',title:'Notes',url:'https://drive.google.com/file/d/1ASGttkiuAe4kn-i5ObEOfdxYP5eWd4Xf/view?usp=drive_link'}),
+  Object.freeze({subject:'History',title:'Notes',url:'https://drive.google.com/file/d/15g9uJzFdjBXhTQL0TvL-8FLVwkrkSBFa/view?usp=drive_link'})
+]);
 export function driveMaterialLink(value) {
   let url;
   try { url=new URL(typeof value==='string'?value.trim():''); } catch { throw new Error('Paste a Google Drive file or folder link.'); }
@@ -337,7 +346,7 @@ export function validateMaterialLibrary(state) {
   return state;
 }
 export function initialiseMaterials(state) {
-  if(state.materialsInitialized && (state.materialsVersion || 1)>=3)return false;
+  if(state.materialsInitialized && (state.materialsVersion || 1)>=4)return false;
   validateMaterialLibrary(state);
   const next={...state,materialFolders:clone(state.materialFolders || []),materials:clone(state.materials || [])};
   const uniqueId=(base,rows)=>{let id=base,n=2;while(rows.some(r=>r.id===id))id=base+':'+n++;return id;};
@@ -347,15 +356,15 @@ export function initialiseMaterials(state) {
     if(!folder){folder={id:uniqueId(id,next.materialFolders),parent,name,date:'2026-11-09'};next.materialFolders.push(folder);}
     return folder;
   };
+  const fileId=value=>{const url=new URL(value);return url.pathname.match(/^\/file\/d\/([^/]+)/)?.[1] || (url.pathname==='/open'?url.searchParams.get('id'):null);};
+  const alreadySaved=url=>next.materials.some(file=>fileId(file.url)===fileId(url));
   if(!next.materialsInitialized && !next.materialFolders.length && !next.materials.length){
     const history=ensureFolder('materials:gs','History','materials:history');
     next.materials.push({id:'materials:history-one-liner',folder:history.id,title:'History one liner',url:HISTORY_MATERIAL_URL,date:'2026-11-09'});
   }
   if((next.materialsVersion || 1)<2){
     // Identify the actual Drive file, even if its sharing query or title was edited.
-    const grammarId=new URL(GRAMMAR_MATERIAL_URL).pathname.split('/')[3];
-    const alreadySaved=next.materials.some(file=>{const url=new URL(file.url);return (url.pathname.match(/^\/file\/d\/([^/]+)/)?.[1] || (url.pathname==='/open'?url.searchParams.get('id'):null))===grammarId;});
-    if(!alreadySaved){
+    if(!alreadySaved(GRAMMAR_MATERIAL_URL)){
       const grammar=ensureFolder('materials:english','Grammar','materials:grammar');
       next.materials.push({id:uniqueId('materials:english-grammar',next.materials),folder:grammar.id,title:'ENGLISH GRAMMAR',url:GRAMMAR_MATERIAL_URL,date:'2026-11-09'});
     }
@@ -363,7 +372,15 @@ export function initialiseMaterials(state) {
   if((next.materialsVersion || 1)<3){
     for(const name of GS_MATERIAL_FOLDERS)ensureFolder('materials:gs',name,name==='History'?'materials:history':'materials:gs-'+name.toLowerCase().replace(/ /g,'-'));
   }
-  next.materialsInitialized=true;next.materialsVersion=Math.max(3,next.materialsVersion || 1);
+  if((next.materialsVersion || 1)<4){
+    for(const item of GS_MATERIAL_LINKS){
+      if(alreadySaved(item.url))continue;
+      const slug=item.subject.toLowerCase().replace(/ /g,'-');
+      const folder=ensureFolder('materials:gs',item.subject,item.subject==='History'?'materials:history':'materials:gs-'+slug);
+      next.materials.push({id:uniqueId('materials:gs-'+slug+'-pdf',next.materials),folder:folder.id,title:item.title,url:item.url,date:'2026-11-09'});
+    }
+  }
+  next.materialsInitialized=true;next.materialsVersion=Math.max(4,next.materialsVersion || 1);
   validateMaterialLibrary(next);
   state.materialFolders=next.materialFolders;state.materials=next.materials;state.materialsInitialized=next.materialsInitialized;state.materialsVersion=next.materialsVersion;
   return true;
